@@ -3,11 +3,11 @@
 version = File.read(File.expand_path('../../BOSH_VERSION', __FILE__)).strip
 
 Gem::Specification.new do |s|
-  s.name         = 'bosh_gce_cpi'
+  s.name         = 'bosh_google_cpi'
   s.version      = version
   s.platform     = Gem::Platform::RUBY
-  s.summary      = 'BOSH Google Compute Engine CPI'
-  s.description  = "BOSH Google Compute Engine CPI\n#{`git rev-parse HEAD`[0, 6]}"
+  s.summary      = 'BOSH Google Engine CPI'
+  s.description  = "BOSH Google Engine CPI\n#{`git rev-parse HEAD`[0, 6]}"
   s.author       = 'Altoros'
   s.homepage     = 'https://github.com/Altoros/bosh'
   s.license      = 'Apache 2.0'

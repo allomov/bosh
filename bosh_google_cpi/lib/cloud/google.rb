@@ -1,5 +1,6 @@
 module Bosh
-  module GCECloud; end
+  module Google
+  end
 end
 
 require "bosh/registry/client"
