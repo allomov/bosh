@@ -4,9 +4,9 @@ module Bosh::Director
   module DeploymentPlan
     describe Assembler do
       before(:each) do
-        @cloud = stub(:Cloud)
+        @cloud = double(:Cloud)
         Config.stub(:cloud).and_return(@cloud)
-        @deployment_plan = stub(:DeploymentPlan)
+        @deployment_plan = double(:DeploymentPlan)
         @assembler = Assembler.new(@deployment_plan)
       end
 
@@ -24,8 +24,8 @@ module Bosh::Director
       end
 
       it 'should bind releases' do
-        r1 = stub(ReleaseVersion)
-        r2 = stub(ReleaseVersion)
+        r1 = double(ReleaseVersion)
+        r2 = double(ReleaseVersion)
 
         plan.should_receive(:releases).and_return([r1, r2])
 
@@ -126,7 +126,7 @@ module Bosh::Director
         it 'should bind an idle vm' do
           state = { 'resource_pool' => { 'name' => 'baz' } }
           reservations = { 'foo' => 'reservation' }
-          resource_pool = stub(:ResourcePool)
+          resource_pool = double(:ResourcePool)
 
           @deployment_plan.stub(:resource_pool).with('baz').
             and_return(resource_pool)
@@ -158,13 +158,13 @@ module Bosh::Director
 
       describe :bind_idle_vm do
         before(:each) do
-          @network = stub(Network)
+          @network = double(Network)
           @network.stub(:name).and_return('foo')
-          @reservation = stub(:NetworkReservation)
-          @resource_pool = stub(:ResourcePool)
+          @reservation = double(:NetworkReservation)
+          @resource_pool = double(:ResourcePool)
           @resource_pool.stub(:name).and_return('baz')
           @resource_pool.stub(:network).and_return(@network)
-          @idle_vm = stub(:IdleVm)
+          @idle_vm = double(:IdleVm)
           @vm = Models::Vm.make
         end
 
@@ -211,9 +211,9 @@ module Bosh::Director
           state = { 'state' => 'baz' }
           reservations = { 'net' => 'reservation' }
 
-          instance = stub(Instance)
-          resource_pool = stub(:ResourcePool)
-          job = stub(Job)
+          instance = double(Instance)
+          resource_pool = double(:ResourcePool)
+          job = double(Job)
           job.stub(:instance).with(3).and_return(instance)
           job.stub(:resource_pool).and_return(resource_pool)
           @deployment_plan.stub(:job).with('foo').and_return(job)
@@ -232,9 +232,9 @@ module Bosh::Director
           state = { 'state' => 'baz' }
           reservations = { 'net' => 'reservation' }
 
-          instance = stub(Instance)
-          resource_pool = stub(:ResourcePool)
-          job = stub(Job)
+          instance = double(Instance)
+          resource_pool = double(:ResourcePool)
+          job = double(Job)
           job.stub(:instance).with(3).and_return(instance)
           job.stub(:resource_pool).and_return(resource_pool)
           @deployment_plan.stub(:job).with('bar').and_return(job)
@@ -264,8 +264,8 @@ module Bosh::Director
 
       describe :get_network_reservations do
         it 'should reserve all of the networks listed in the state' do
-          foo_network = stub(Network)
-          bar_network = stub(Network)
+          foo_network = double(Network)
+          bar_network = double(Network)
 
           @deployment_plan.stub(:network).with('foo').and_return(foo_network)
           @deployment_plan.stub(:network).with('bar').and_return(bar_network)
@@ -302,8 +302,8 @@ module Bosh::Director
           state = { 'state' => 'baz' }
 
           vm = Models::Vm.make(:agent_id => 'agent-1')
-          client = stub(:AgentClient)
-          AgentClient.stub(:new).with('agent-1').and_return(client)
+          client = double(:AgentClient)
+          AgentClient.stub(:with_defaults).with('agent-1').and_return(client)
 
           client.should_receive(:get_state).and_return(state)
           @assembler.should_receive(:verify_state).with(vm, state)
@@ -403,9 +403,9 @@ module Bosh::Director
 
       describe :bind_instance_networks do
         before(:each) do
-          @job_spec = stub(Job)
-          @instance_spec = stub(Instance)
-          @network_spec = stub(Network)
+          @job_spec = double(Job)
+          @instance_spec = double(Instance)
+          @network_spec = double(Network)
 
           @deployment_plan.stub(:jobs).and_return([@job_spec])
           @deployment_plan.stub(:network).with('network-a').
@@ -438,15 +438,15 @@ module Bosh::Director
 
       describe :bind_configuration do
         before(:each) do
-          @template_spec = stub(:TemplateSpec)
-          @job_spec = stub(Job)
+          @template_spec = double(:TemplateSpec)
+          @job_spec = double(Job)
           @deployment_plan.stub(:jobs).and_return([@job_spec])
         end
 
         it 'should bind the configuration hash' do
-          configuration_hasher = stub(:ConfigurationHasher)
-          configuration_hasher.should_receive(:hash)
-          ConfigurationHasher.stub(:new).with(@job_spec).
+          configuration_hasher = double(:JobRenderer)
+          configuration_hasher.should_receive(:render_job_instances)
+          JobRenderer.stub(:new).with(@job_spec).
             and_return(configuration_hasher)
           @assembler.bind_configuration
         end
@@ -512,7 +512,131 @@ module Bosh::Director
       end
 
       describe :bind_instance_vms
-      describe :bind_instance_vm
+
+      describe '#bind_instance_vm' do
+        let(:instance) do
+          instance_double(
+            'Bosh::Director::DeploymentPlan::Instance',
+            job: job,
+            idle_vm: idle_vm,
+            index: 'fake-index',
+            :current_state= => nil,
+            model: instance_model,
+          )
+        end
+
+        let(:job) do
+          instance_double(
+            'Bosh::Director::DeploymentPlan::Job',
+            name: 'fake-job-name',
+            spec: 'fake-job-spec',
+            release: release,
+          )
+        end
+
+        let(:release)  { instance_double('Bosh::Director::DeploymentPlan::Release',  spec: 'fake-release-spec') }
+
+        let(:instance_model) { Models::Instance.make(vm: nil) }
+
+        let(:idle_vm) do
+          instance_double(
+            'Bosh::Director::DeploymentPlan::IdleVm',
+            current_state: { 'fake-vm-existing-state' => true },
+            vm: idle_vm_model,
+          )
+        end
+
+        let(:idle_vm_model) { Models::Vm.make(agent_id: 'fake-agent-id') }
+
+        before { AgentClient.stub(with_defaults: agent) }
+        let(:agent) { instance_double('Bosh::Director::AgentClient') }
+
+        it 'sends apply message to an agent' do
+          AgentClient.should_receive(:with_defaults).with('fake-agent-id').and_return(agent)
+          expect(agent).to receive(:apply).with(be_an_instance_of(Hash))
+          @assembler.bind_instance_vm(instance)
+        end
+
+        it 'sends apply message that includes existing vm state' do
+          expect(agent).to receive(:apply).with(hash_including('fake-vm-existing-state' => true))
+          @assembler.bind_instance_vm(instance)
+        end
+
+        it 'sends apply message to an agent that includes new job spec, instance index, and release spec' do
+          expect(agent).to receive(:apply).with(hash_including(
+            'job' => 'fake-job-spec',
+            'index' => 'fake-index',
+            'release' => 'fake-release-spec',
+          ))
+          @assembler.bind_instance_vm(instance)
+        end
+
+        def self.it_rolls_back_instance_and_vm_state(error)
+          it 'does not point instance to the vm so that during the next deploy instance can be re-associated with new vm' do
+            expect {
+              expect { @assembler.bind_instance_vm(instance) }.to raise_error(error)
+            }.to_not change { instance_model.refresh.vm }.from(nil)
+          end
+
+          it 'does not change apply spec on vm model' do
+            expect {
+              expect { @assembler.bind_instance_vm(instance) }.to raise_error(error)
+            }.to_not change { idle_vm_model.refresh.apply_spec }.from(nil)
+          end
+
+          it 'does not change current state on the instance' do
+            instance.should_not_receive(:current_state=)
+            expect { @assembler.bind_instance_vm(instance) }.to raise_error(error)
+          end
+        end
+
+        context 'when agent apply succeeds' do
+          before { agent.stub(apply: nil) }
+
+          context 'when saving state changes to the database succeeds' do
+            it 'the instance points to the vm' do
+              expect {
+                @assembler.bind_instance_vm(instance)
+              }.to change { instance_model.refresh.vm }.from(nil).to(idle_vm_model)
+            end
+
+            it 'the vm apply spec is set to new state' do
+              expect {
+                @assembler.bind_instance_vm(instance)
+              }.to change { idle_vm_model.refresh.apply_spec }.from(nil).to(hash_including(
+                'fake-vm-existing-state' => true,
+                'job' => 'fake-job-spec',
+              ))
+            end
+
+            it 'the instance current state is set to new state' do
+              instance.should_receive(:current_state=).with(hash_including(
+                'fake-vm-existing-state' => true,
+                'job' => 'fake-job-spec',
+              ))
+              @assembler.bind_instance_vm(instance)
+            end
+          end
+
+          context 'when update vm instance in the database fails' do
+            error = Exception.new('error')
+            before { instance_model.stub(:_update_without_checking).and_raise(error) }
+            it_rolls_back_instance_and_vm_state(error)
+          end
+
+          context 'when update vm apply spec in the database fails' do
+            error = Exception.new('error')
+            before { idle_vm_model.stub(:_update_without_checking).and_raise(error) }
+            it_rolls_back_instance_and_vm_state(error)
+          end
+        end
+
+        context 'when agent apply fails' do
+          error = Bosh::Director::RpcTimeout.new('error')
+          before { agent.stub(:apply).and_raise(error) }
+          it_rolls_back_instance_and_vm_state(error)
+        end
+      end
 
       describe :delete_unneeded_vms do
         it 'should delete unneeded VMs' do

@@ -62,7 +62,7 @@ module Bosh::Director
         Config.stub(:dns_domain_name).and_return('bosh')
         @deleter.should_receive(:delete_dns_records).with('5.test.%.foo.bosh', 0)
         @deployment_plan.should_receive(:canonical_name).and_return('foo')
-        domain = stub('domain', id:  0)
+        domain = double('domain', id:  0)
         @deployment_plan.should_receive(:dns_domain).and_return(domain)
         @cloud.should_receive(:delete_vm).with(vm.cid)
 
@@ -76,7 +76,7 @@ module Bosh::Director
     describe :drain do
       it 'should drain the VM' do
         agent = double('agent')
-        AgentClient.stub(:new).with('some_agent_id').and_return(agent)
+        AgentClient.stub(:with_defaults).with('some_agent_id').and_return(agent)
 
         agent.should_receive(:drain).with('shutdown').and_return(2)
         agent.should_receive(:stop)
@@ -87,7 +87,7 @@ module Bosh::Director
 
       it 'should dynamically drain the VM' do
         agent = double('agent')
-        AgentClient.stub(:new).with('some_agent_id').and_return(agent)
+        AgentClient.stub(:with_defaults).with('some_agent_id').and_return(agent)
         Config.stub(:job_cancelled?).and_return(nil)
 
         agent.should_receive(:drain).with('shutdown').and_return(-2)
@@ -102,7 +102,7 @@ module Bosh::Director
 
       it 'should stop vm-drain if task is cancelled' do
         agent = double('agent')
-        AgentClient.stub(:new).with('some_agent_id').and_return(agent)
+        AgentClient.stub(:with_defaults).with('some_agent_id').and_return(agent)
         Config.stub(:job_cancelled?).and_raise(TaskCancelled.new(1))
         agent.should_receive(:drain).with('shutdown').and_return(-2)
         lambda { @deleter.drain('some_agent_id') }.should raise_error(TaskCancelled)

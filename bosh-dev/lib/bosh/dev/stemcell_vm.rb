@@ -4,10 +4,14 @@ module Bosh::Dev
       @vm_name = options.fetch(:vm_name)
       @infrastructure_name = options.fetch(:infrastructure_name)
       @operating_system_name = options.fetch(:operating_system_name)
+      @agent_name = options.fetch(:agent_name, 'ruby')
       @env = env
     end
 
     def publish
+      rake_task_args = "#{infrastructure_name},#{operating_system_name}"
+      rake_task_args += ",#{agent_name}" unless agent_name == 'ruby'
+
       Rake::FileUtilsExt.sh <<-BASH
         set -eu
 
@@ -15,14 +19,14 @@ module Bosh::Dev
         [ -e .vagrant/machines/remote/aws/id ] && vagrant destroy #{vm_name} --force
         vagrant up #{vm_name} --provider #{provider}
 
-        time vagrant ssh -c "
+        vagrant ssh -c "
           set -eu
           cd /bosh
           bundle install --local
 
           #{exports.join("\n          ")}
 
-          time bundle exec rake ci:publish_stemcell[#{infrastructure_name},#{operating_system_name}]
+          bundle exec rake ci:publish_stemcell[#{rake_task_args}]
         " #{vm_name}
       BASH
     ensure
@@ -35,7 +39,7 @@ module Bosh::Dev
 
     private
 
-    attr_reader :vm_name, :infrastructure_name, :operating_system_name, :env
+    attr_reader :vm_name, :infrastructure_name, :operating_system_name, :agent_name, :env
 
     def provider
       case vm_name

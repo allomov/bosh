@@ -8,12 +8,16 @@ module Bosh::Stemcell
         env,
         infrastructure_name: infrastructure.name,
         operating_system_name: operating_system.name,
+        agent_name: agent_name,
         release_tarball_path: release_tarball_path,
         version: version
       )
     end
 
     let(:env) { {} }
+
+    let(:agent_name) { 'ruby' }
+    let(:expected_agent_name) { 'ruby' }
 
     let(:infrastructure) do
       instance_double(
@@ -28,11 +32,12 @@ module Bosh::Stemcell
     let(:version) { '007' }
 
     before do
-      Infrastructure.stub(:for).with('vsphere').and_return(infrastructure)
+      Infrastructure.stub(:for).with(infrastructure.name).and_return(infrastructure)
       OperatingSystem.stub(:for).with(operating_system.name).and_return(operating_system)
       StageCollection.stub(:new).with(
         infrastructure: infrastructure,
-        operating_system: operating_system
+        operating_system: operating_system,
+        agent_name: agent_name,
       ).and_return(stage_collection)
 
       StageRunner.stub(:new).with(
@@ -47,7 +52,8 @@ module Bosh::Stemcell
         tarball: release_tarball_path,
         stemcell_version: version,
         infrastructure: infrastructure,
-        operating_system: operating_system
+        operating_system: operating_system,
+        agent_name: expected_agent_name,
       ).and_return(stemcell_builder_options)
     end
 
@@ -62,8 +68,7 @@ module Bosh::Stemcell
     let(:stage_collection) do
       instance_double(
         'Bosh::Stemcell::StageCollection',
-        operating_system_stages: ['FAKE_OS_STAGES'],
-        infrastructure_stages: ['FAKE_INFRASTRUCTURE_STAGES']
+        all_stages: %w(FAKE_OS_STAGES FAKE_INFRASTRUCTURE_STAGES)
       )
     end
 
@@ -94,6 +99,36 @@ module Bosh::Stemcell
         FileUtils.stub(:cp_r).with([], File.join(root_dir, 'build', 'build'), preserve: true, verbose: true) do
           FileUtils.mkdir_p(etc_dir)
           FileUtils.touch(settings_file)
+        end
+      end
+
+      context 'when agent_name is nil' do
+        let(:agent_name) { nil }
+        let(:expected_agent_name) { 'ruby' }
+
+        it 'uses the correct agent name for the stage collection' do
+          StageCollection.should_receive(:new).with(
+            infrastructure: infrastructure,
+            operating_system: operating_system,
+            agent_name: expected_agent_name,
+          ).and_return(stage_collection)
+
+          stemcell_builder_command.build
+        end
+      end
+
+      context 'when agent_name is foo' do
+        let(:agent_name) { 'foo' }
+        let(:expected_agent_name) { 'foo' }
+
+        it 'uses the correct agent name for the stage collection' do
+          StageCollection.should_receive(:new).with(
+            infrastructure: infrastructure,
+            operating_system: operating_system,
+            agent_name: expected_agent_name,
+          ).and_return(stage_collection)
+
+          stemcell_builder_command.build
         end
       end
 
@@ -168,35 +203,104 @@ module Bosh::Stemcell
           [
             "cd #{File.expand_path('../../..', File.dirname(__FILE__))};",
             "STEMCELL_IMAGE=#{File.join(root_dir, 'work', 'work', 'fake-root-disk-image.raw')}",
-            'bundle exec rspec -fd',
+            "bundle exec rspec -fd#{additional_rspec_options}",
             "spec/stemcells/#{operating_system.name}_spec.rb",
+            "spec/stemcells/#{agent_name}_agent_spec.rb",
             "spec/stemcells/#{infrastructure.name}_spec.rb",
           ].join(' ')
         end
+        let(:additional_rspec_options) { '' }
 
-        it 'calls #configure_and_apply' do
-          stage_runner.should_receive(:configure_and_apply).
-            with(['FAKE_OS_STAGES']).ordered
-          stage_runner.should_receive(:configure_and_apply).
-            with(['FAKE_INFRASTRUCTURE_STAGES']).ordered
-          stemcell_builder_command.should_receive(:system).
-            with(expected_rspec_command).ordered
+        shared_examples_for 'a builder that calls #configure_and_apply correctly' do
+          it 'calls #configure_and_apply' do
+            stage_runner.should_receive(:configure_and_apply).
+              with(%w(FAKE_OS_STAGES FAKE_INFRASTRUCTURE_STAGES)).ordered
+            stemcell_builder_command.should_receive(:system).
+              with(expected_rspec_command).ordered
 
-          stemcell_builder_command.build
+            stemcell_builder_command.build
+          end
         end
 
         context 'with CentOS' do
           let(:operating_system) { instance_double('Bosh::Stemcell::OperatingSystem::Centos', name: 'centos') }
 
-          it 'calls #configure_and_apply' do
-            stage_runner.should_receive(:configure_and_apply).
-              with(['FAKE_OS_STAGES']).ordered
-            stage_runner.should_receive(:configure_and_apply).
-              with(['FAKE_INFRASTRUCTURE_STAGES']).ordered
-            stemcell_builder_command.should_receive(:system).
-              with(expected_rspec_command).ordered
+          context 'on AWS' do
+            let(:infrastructure) do
+              instance_double(
+                'Bosh::Stemcell::Infrastructure::Aws',
+                name: 'aws',
+                hypervisor: 'xen'
+              )
+            end
 
-            stemcell_builder_command.build
+            it_behaves_like 'a builder that calls #configure_and_apply correctly'
+          end
+
+          context 'on vSphere' do
+            let(:infrastructure) do
+              instance_double(
+                'Bosh::Stemcell::Infrastructure::Vsphere',
+                name: 'vsphere',
+                hypervisor: 'esxi'
+              )
+            end
+            let(:additional_rspec_options) { ' --tag ~exclude_on_vsphere' }
+
+            it_behaves_like 'a builder that calls #configure_and_apply correctly'
+          end
+
+          context 'on OpenStack' do
+            let(:infrastructure) do
+              instance_double(
+                'Bosh::Stemcell::Infrastructure::OpenStack',
+                name: 'aws',
+                hypervisor: 'kvm'
+              )
+            end
+
+            it_behaves_like 'a builder that calls #configure_and_apply correctly'
+          end
+        end
+
+        context 'with Ubuntu' do
+          let(:operating_system) { instance_double('Bosh::Stemcell::OperatingSystem::Ubuntu', name: 'ubuntu') }
+
+          context 'on AWS' do
+            let(:infrastructure) do
+              instance_double(
+                'Bosh::Stemcell::Infrastructure::Aws',
+                name: 'aws',
+                hypervisor: 'xen'
+              )
+            end
+
+            it_behaves_like 'a builder that calls #configure_and_apply correctly'
+          end
+
+          context 'on vSphere' do
+            let(:infrastructure) do
+              instance_double(
+                'Bosh::Stemcell::Infrastructure::Vsphere',
+                name: 'vsphere',
+                hypervisor: 'esxi'
+              )
+            end
+            let(:additional_rspec_options) { ' --tag ~exclude_on_vsphere' }
+
+            it_behaves_like 'a builder that calls #configure_and_apply correctly'
+          end
+
+          context 'on OpenStack' do
+            let(:infrastructure) do
+              instance_double(
+                'Bosh::Stemcell::Infrastructure::OpenStack',
+                name: 'aws',
+                hypervisor: 'kvm'
+              )
+            end
+
+            it_behaves_like 'a builder that calls #configure_and_apply correctly'
           end
         end
       end

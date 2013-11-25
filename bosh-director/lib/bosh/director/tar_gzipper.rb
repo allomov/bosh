@@ -3,8 +3,6 @@ require 'open3'
 
 module Bosh::Director
   class TarGzipper
-    include Bosh::RunsCommands
-
     # @param [String] base_dir the directory from which the tar command is run
     # @param [String, Array] sources the relative paths to include
     # @param [String] dest the destination filename for the tgz output
@@ -38,6 +36,7 @@ module Bosh::Director
     end
 
     private
+
     def tar(base_dir, dest, sources)
       out, err, status = Open3.capture3('tar', '-C', base_dir, '-czf', dest, *sources)
       raise("tar exited #{status.exitstatus}, output: '#{out}', error: '#{err}'") unless status.success?
