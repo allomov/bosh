@@ -1,4 +1,4 @@
-module Bosh::Gce
+module Bosh::Google
 
   class Cloud < Bosh::Cloud
     include Helpers
