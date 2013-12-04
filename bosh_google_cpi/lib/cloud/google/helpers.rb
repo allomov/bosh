@@ -1,7 +1,61 @@
-module Bosh::Gce
+module Bosh::Google
 
-  class Helpers
+  module Helpers
 
+    include Bosh::Google::CommonHelpers
+
+    %w(validate_options initialize_registry).each do |m|
+      define_method m do 
+        puts "TODO: Implement Helpers##{m} method."
+      end
+    end 
+
+
+    
+  #   ##
+  #   # Checks if options passed to CPI are valid and can actually
+  #   # be used to create all required data structures etc.
+  #   #
+  #   # @return [void]
+  #   # @raise [ArgumentError] if options are not valid
+  #   def validate_options
+
+  #     %w(compute storage).each do |key|
+  #       raise "#{compute} should be present and should be true" if @options[key]
+  #     end
+
+  #     unless @options["google"].is_a?(Hash) &&
+  #            @options["google"]["auth_url"] &&
+  #            @options["google"]["username"] &&
+  #            @options["google"]["api_key"] &&
+  #            @options["google"]["tenant"]
+  #       raise ArgumentError, "Invalid OpenStack configuration parameters"
+  #     end
+
+  #     unless @options.has_key?("registry") &&
+  #         @options["registry"].is_a?(Hash) &&
+  #         @options["registry"]["endpoint"] &&
+  #         @options["registry"]["user"] &&
+  #         @options["registry"]["password"]
+  #       raise ArgumentError, "Invalid registry configuration parameters"
+  #     end
+  #   end
+
+
+  #   ##
+  #   # Inits registry
+  #   #
+  #   def initialize_registry
+  #     # TODO: see if here are surprises.
+  #     registry_properties = @options.fetch('registry')
+  #     registry_endpoint   = registry_properties.fetch('endpoint')
+  #     registry_user       = registry_properties.fetch('user')
+  #     registry_password   = registry_properties.fetch('password')
+
+  #     @registry = Bosh::Registry::Client.new(registry_endpoint,
+  #                                            registry_user,
+  #                                            registry_password)
+  #   end    
 
   end
 

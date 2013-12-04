@@ -1,32 +1,63 @@
 module Bosh::Google
 
   class Cloud < Bosh::Cloud
-    include Helpers
-    include Constants
+    include Bosh::Google::Helpers
+    include Bosh::Google::Constants
 
     attr_reader   :registry
     attr_reader   :options
     attr_accessor :logger
     attr_accessor :connection
+    attr_accessor :compute
+    attr_accessor :storage
+
 
     ##
     # Cloud initialization
     #
     # @param [Hash] options cloud options
     def initialize(options)
-      @logger = Bosh::Clouds::Config.logger
-      @options = options.dup.freeze
-      # TODO : raise descriptive error if connection fails
-      @connection = Fog::Compute.new({ :provider => "Google" }) 
+      self.options = options.dup
+      self.logger  = Bosh::Clouds::Config.logger
 
       validate_options
-
-
+      initialize_registry
+      # TODO: move it to helper
       # initialize_google_fog
-      # initialize_registry
-      
-      # what is wrong with threading here ?
-      # @metadata_lock = Mutex.new
+
+      # TODO: what does it makes? 
+      # @agent_properties  = @options["agent"] || {} 
+      @google_properties = @options["google"]
+
+      compute_params = {
+        :provider => 'google',
+        :google_client_email => @google_properties['compute']['client_email'],
+        :google_key_location => @google_properties['compute']['key_location'],
+        :google_project      => @google_properties['compute']['project'],
+      }
+
+      begin
+        @compute = Fog::Compute.new(compute_params)
+      rescue Exception => e
+        @logger.error(e)
+        cloud_error("Unable to connect to the OpenStack Compute API. Check task debug log for details.")  
+      end
+
+      storage_params = {
+        :provider => 'google',
+        :google_storage_access_key_id => @google_properties['storage']['access_key'],
+        :google_storage_secret_access_key => @google_properties['storage']['secret']
+      }
+
+      begin
+        @storage = Fog::Storage.new(storage_params)
+      rescue Exception => e
+        @logger.error(e)
+        cloud_error("Unable to connect to the OpenStack Image Service API. Check task debug log for details.")
+      end
+
+      @metadata_lock = Mutex.new
+
     end
 
     ##
@@ -34,6 +65,7 @@ module Bosh::Google
     #
     # @return [String] opaque id later used by other methods of the CPI    
     def current_vm_id
+      # 
     end
 
     ##
@@ -41,9 +73,29 @@ module Bosh::Google
     #
     # @param [String] image_path path to an opaque blob containing the stemcell image
     # @param [Hash] cloud_properties properties required for creating this template
+    #               stemcell_properties
     #               specific to a CPI
     # @return [String] opaque id later used by {#create_vm} and {#delete_stemcell}
     def create_stemcell(image_path, stemcell_properties)
+      with_thread_name("create_stemcell(#{image_path}...)") do
+
+      end
+      id = (rand*10).to_s.gsub('.', '')
+      bucket_name = "bosh-fake-bucket"
+      object_name = "bosh-fake-stemcell-image-#{id}"
+      
+      # try to get_bucket ?
+      
+      storage.put_bucket(bucket_name, 'LocationConstraint' => 'US', 'x-amz-acl' => 'public-read') # acl ?
+
+      image_file = File.open(File.join(File.dirname(__FILE__), 'tmp', 'root.img'), 'r')
+      
+      storage.put_object(bucket_name, object_name, image_file)
+
+      
+      compute.create_image(image_name, bucket_name)
+
+
     end
 
     ##
@@ -94,6 +146,7 @@ module Bosh::Google
     # @return [String] opaque id later used by {#configure_networks}, {#attach_disk},
     #                  {#detach_disk}, and {#delete_vm}
     def create_vm(agent_id, stemcell_id, resource_pool, network_spec, disk_locality = nil, environment = nil)
+
     end
 
     ##
@@ -102,6 +155,7 @@ module Bosh::Google
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @return [void]
     def delete_vm(instance_id)
+
     end
 
     ##
@@ -110,6 +164,7 @@ module Bosh::Google
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @return [Boolean] True if the vm exists
     def has_vm?(instance_id)
+
     end
 
     ##
@@ -168,6 +223,7 @@ module Bosh::Google
     end
 
     def detach_disk(instance_id, disk_id)
+
     end
 
     def get_disks(vm_id)
@@ -186,10 +242,6 @@ module Bosh::Google
       # TODO: find out how to use configuration
       connection.insert_network('my-private-network', '10.240.0.0/16')
     end
-
-
-
-
 
   end
 end
