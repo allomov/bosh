@@ -1,6 +1,6 @@
-module Bosh::Gce
+module Bosh::Cloud
 
-  class Constants
+  module Constants
 
     def self.default_max_retries
       2
