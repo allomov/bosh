@@ -1,12 +1,11 @@
-# # Copyright (c) 2009-2013 VMware, Inc.
-# # Copyright (c) 2012 Piston Cloud Computing, Inc.
 require 'rspec'
 require 'tmpdir'
 require 'zlib'
 require 'archive/tar/minitar'
 include Archive::Tar
 
-require 'cloud/google'
+require 'bosh_google_cpi'
+
 
 # def internal_to(*args, &block)
 #   example = describe *args, &block

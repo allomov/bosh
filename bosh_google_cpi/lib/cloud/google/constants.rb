@@ -1,4 +1,4 @@
-module Bosh::Cloud
+module Bosh::Google
 
   module Constants
 

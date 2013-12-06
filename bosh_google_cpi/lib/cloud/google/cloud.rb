@@ -3,6 +3,7 @@ module Bosh::Google
   class Cloud < Bosh::Cloud
     include Bosh::Google::Helpers
     include Bosh::Google::Constants
+    include Bosh::Google::CommonHelpers
 
     attr_reader   :registry
     attr_reader   :options
