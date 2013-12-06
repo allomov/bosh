@@ -5,6 +5,11 @@ end
 
 require "bosh/registry/client"
 
+require "common/exec"
+require "common/thread_pool"
+require "common/thread_formatter"
+
+require "cloud"
 require "cloud/google/common_helpers"
 require "cloud/google/helpers"
 require "cloud/google/constants"

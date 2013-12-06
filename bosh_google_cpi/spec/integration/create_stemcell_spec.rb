@@ -3,11 +3,12 @@ require "spec_helper"
 describe Bosh::Google::Cloud do
 
   before(:all) do
+    @config = {}
     %w(client_email key_location project storage_access_key storage_secret).each do |attribute|
       variable_name  = :"@#{attribute}"
       bosh_key_name  = "BOSH_GOOGLE_#{attribute.upcase}"
       variable_value = ENV[bosh_key_name] || raise("Missing #{bosh_key_name}")
-      instance_varibale_set(variable_name, variable_value)
+      @config[variable_name] = variable_value
     end
   end
 

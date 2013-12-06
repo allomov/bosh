@@ -1,1 +1,1 @@
-rvm use --create 2.0@bosh
+rvm use --create ruby-2.0.0-p247@bosh
