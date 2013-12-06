@@ -17,10 +17,10 @@ Gem::Specification.new do |s|
   s.files        = `git ls-files -- bin/* lib/* scripts/*`.split("\n") + %w(README.md)
   s.require_path = 'lib'
   s.bindir       = 'bin'
-  s.executables  = %w(bosh_aws_console)
+  s.executables  = %w()
 
-  s.add_dependency 'google-api-client', '1.8.5'
-  # s.add_dependency 'fog', '1.14.0'
+  s.add_dependency 'google-api-client', '~>0.6.4'
+  s.add_dependency 'fog', '1.14.0'
 
   s.add_dependency 'bosh_common', "~>#{version}"
   s.add_dependency 'bosh_cpi', "~>#{version}"
