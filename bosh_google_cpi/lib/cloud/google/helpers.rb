@@ -10,6 +10,18 @@ module Bosh::Google
       end
     end 
 
+    def generate_unique_name_from_email
+      Digest::MD5.hexdigest(client_email)
+    end
+
+    def generate_unique_name
+      SecureRandom.hex
+    end
+
+    def client_email
+      self.options['google']['compute']['client_email']
+    end
+
 
     
   #   ##

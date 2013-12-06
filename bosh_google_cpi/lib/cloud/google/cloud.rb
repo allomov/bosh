@@ -60,12 +60,14 @@ module Bosh::Google
 
     end
 
+
     ##
     # Get the vm_id of this host
     #
-    # @return [String] opaque id later used by other methods of the CPI    
+    # @return [String] opaque id later used by other methods of the CPI
+    # TODO: how it should work ? 
     def current_vm_id
-      # 
+      not_implemented(:current_vm_id)
     end
 
     ##
@@ -73,29 +75,60 @@ module Bosh::Google
     #
     # @param [String] image_path path to an opaque blob containing the stemcell image
     # @param [Hash] cloud_properties properties required for creating this template
-    #               stemcell_properties
     #               specific to a CPI
     # @return [String] opaque id later used by {#create_vm} and {#delete_stemcell}
-    def create_stemcell(image_path, stemcell_properties)
+    # 
+    # I assume here that image_path contains path to the file
+    def create_stemcell(image_path, _)
       with_thread_name("create_stemcell(#{image_path}...)") do
+        begin
+          Dir.mktmpdir do |tmp_dir|
+            @logger.info("Creating new image...")
+            directory_name = "bosh-stemcells-#{generate_unique_name_from_email}"
+            image_name     = "bosh-#{File.basename(image_path)}-#{generate_unique_name}"
+                        
+            # check if folder exists and has access
+            direcrtory = @storage.directories.get(directory_name)
+            if direcrtory.nil?
+              remote do 
+                direcrtory = @storage.directories.new
+                direcrtory.key = directory_name
+                direcrtory.save
+              end
+            end
+            
+            # If image_path is set to existing file, then 
+            # from the remote location on a background job and store it in its repository.
+            # Otherwise, unpack image to temp directory and upload to Glance the root image.
 
+            @logger.info("Extracting stemcell file to `#{tmp_dir}'...")
+            unpack_image(tmp_dir, image_path)
+            image_file = File.join(tmp_dir, "root.img")
+
+            file = nil
+            remote do 
+              file = directory.files.new
+              file.key = image_name
+              file.body = File.open(image_file, 'r')
+              file.save
+            end
+
+            remote do 
+              image = compute.images.new
+              image.key = image_name
+              image.raw_disk = file.url
+              image.save              
+            end
+
+            wait_resource(image, :active)
+            
+            image.id.to_s
+          end
+        rescue => e
+          @logger.error(e)
+          raise e
+        end
       end
-      id = (rand*10).to_s.gsub('.', '')
-      bucket_name = "bosh-fake-bucket"
-      object_name = "bosh-fake-stemcell-image-#{id}"
-      
-      # try to get_bucket ?
-      
-      storage.put_bucket(bucket_name, 'LocationConstraint' => 'US', 'x-amz-acl' => 'public-read') # acl ?
-
-      image_file = File.open(File.join(File.dirname(__FILE__), 'tmp', 'root.img'), 'r')
-      
-      storage.put_object(bucket_name, object_name, image_file)
-
-      
-      compute.create_image(image_name, bucket_name)
-
-
     end
 
     ##
@@ -104,10 +137,8 @@ module Bosh::Google
     # @param [String] stemcell stemcell id that was once returned by {#create_stemcell}
     # @return [void]
     def delete_stemcell(stemcell_id)
+      not_implemented(:delete_stemcell)
     end
-
-
-
 
     ##
     # Creates a VM - creates (and powers on) a VM from a stemcell with the proper resources
@@ -145,7 +176,23 @@ module Bosh::Google
     # @param [optional, Hash] env environment that will be passed to this vm
     # @return [String] opaque id later used by {#configure_networks}, {#attach_disk},
     #                  {#detach_disk}, and {#delete_vm}
-    def create_vm(agent_id, stemcell_id, resource_pool, network_spec, disk_locality = nil, environment = nil)
+    def create_vm(agent_id, stemcell_id, resource_pool,
+                  networks, disk_locality = nil, env = nil)
+
+      with_thread_name("create_vm(#{agent_id}, ...)") do
+        @logger.info("Creating new server...")
+        remote do
+          server_name = "vm-#{generate_unique_name}"
+          flavor_name = resource_pool["instance_type"]
+          image        = remote { @compute.images.find  { |f| f.id == stemcell_id } }
+          machine_type = remote { @compute.flavors.find { |f| f.name == flavor_name } }
+          server = @compute.servers.new
+          server.name = server_name
+          server.machine_type = machine_type
+          server.image = image
+          server.save
+        end
+      end
 
     end
 
@@ -154,8 +201,8 @@ module Bosh::Google
     #
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @return [void]
-    def delete_vm(instance_id)
-
+    def delete_vm(vm_id)
+      not_implemented(:delete_vm)
     end
 
     ##
@@ -163,8 +210,8 @@ module Bosh::Google
     #
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @return [Boolean] True if the vm exists
-    def has_vm?(instance_id)
-
+    def has_vm?(vm_id)
+      not_implemented(:has_vm?)
     end
 
     ##
@@ -173,7 +220,8 @@ module Bosh::Google
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @param [Optional, Hash] CPI specific options (e.g hard/soft reboot)
     # @return [void]
-    def reboot_vm(instance_id)
+    def reboot_vm(vm_id)
+      not_implemented(:reboot_vm)
     end
 
     ##
@@ -185,8 +233,18 @@ module Bosh::Google
     # @param [Hash] metadata metadata key/value pairs
     # @return [void]
     def set_vm_metadata(vm, metadata)
-      # TODO: server = get_vm(vm)
-      server.metadata["test"] = "foo"
+      not_implemented(:set_vm_metadata)
+    end
+
+    ##
+    # Configures networking an existing VM.
+    #
+    # @param [String] vm vm id that was once returned by {#create_vm}
+    # @param [Hash] networks list of networks and their settings needed for this VM,
+    #               same as the networks argument in {#create_vm}
+    # @return [void]
+    def configure_networks(vm_id, networks)
+      not_implemented(:configure_networks)
     end
 
     ##
@@ -198,49 +256,69 @@ module Bosh::Google
     # @param [optional, String] vm_locality vm id if known of the VM that this disk will
     #                           be attached to
     # @return [String] opaque id later used by {#attach_disk}, {#detach_disk}, and {#delete_disk}
-    def create_disk(size, instance_id = nil)
-      disk = connection.disks.create({
-        :name => 'foggydisk',
-        :size_gb => 10,
-        :zone_name => 'us-central1-a',
-        :source_image => 'centos-6-v20130522',
-      })
-
-      # TODO: think if we need it 
-      disk.wait_for { disk.ready? }
-
-        # ???
-        server = connection.servers.bootstrap params 
-
+    def create_disk(size, vm_locality = nil)
+      not_implemented(:create_disk)
     end
 
+    ##
+    # Deletes a disk
+    # Will raise an exception if the disk is attached to a VM
+    #
+    # @param [String] disk disk id that was once returned by {#create_disk}
+    # @return [void]
     def delete_disk(disk_id)
-      disk.destroy
+      not_implemented(:delete_disk)
     end
 
-    def attach_disk(instance_id, disk_id)
-
+    ##
+    # Attaches a disk
+    #
+    # @param [String] vm vm id that was once returned by {#create_vm}
+    # @param [String] disk disk id that was once returned by {#create_disk}
+    # @return [void]
+    def attach_disk(vm_id, disk_id)
+      not_implemented(:attach_disk)
     end
 
-    def detach_disk(instance_id, disk_id)
-
+    # Take snapshot of disk
+    # @param [String] disk_id disk id of the disk to take the snapshot of
+    # @return [String] snapshot id
+    def snapshot_disk(disk_id, metadata={})
+      not_implemented(:snapshot_disk)
     end
 
-    def get_disks(vm_id)
-
-    end
-
-    def snapshot_disk(disk_id, metadata)
-
-    end
-
+    # Delete a disk snapshot
+    # @param [String] snapshot_id snapshot id to delete
     def delete_snapshot(snapshot_id)
-
+      not_implemented(:delete_snapshot)
     end
 
-    def configure_networks(instance_id, network_spec)
-      # TODO: find out how to use configuration
-      connection.insert_network('my-private-network', '10.240.0.0/16')
+    ##
+    # Detaches a disk
+    #
+    # @param [String] vm vm id that was once returned by {#create_vm}
+    # @param [String] disk disk id that was once returned by {#create_disk}
+    # @return [void]
+    def detach_disk(vm_id, disk_id)
+      not_implemented(:detach_disk)
+    end
+
+    ##
+    # List the attached disks of the VM.
+    #
+    # @param [String] vm_id is the CPI-standard vm_id (eg, returned from current_vm_id)
+    #
+    # @return [array[String]] list of opaque disk_ids that can be used with the
+    # other disk-related methods on the CPI
+    def get_disks(vm_id)
+      not_implemented(:get_disks)
+    end
+
+    ##
+    # Validates the deployment
+    # @api not_yet_used
+    def validate_deployment(old_manifest, new_manifest)
+      not_implemented(:validate_deployment)
     end
 
   end

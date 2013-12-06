@@ -5,4 +5,4 @@ end
 
 require "bosh/registry/client"
 
-Dir['cloud/gce/*.rb'].each { |d| require d }
+Dir['cloud/google/**/*.rb'].each { |d| require d }
