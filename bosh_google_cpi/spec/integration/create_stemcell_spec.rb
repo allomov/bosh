@@ -12,9 +12,36 @@ describe Bosh::Google::Cloud do
     end
   end
 
+  subject(:cpi) do
+    described_class.new(
+      # TODO: simplify it 
+      # client_email key_location project storage_access_key storage_secret
+      'google' => {
+        'compute' => {
+          'client_email' => @client_email,
+          'key_location' => @key_location,
+          'project' => @project
+        }, 
+        'storage' => {
+          'access_key' => @storage_access_key,
+          'secret' => @storage_secret
+        },
+        "endpoint_type" => "publicURL",
+        "default_key_name" => "some_secret",
+        "default_security_groups" => ["default"]
+      },
+      "registry" => {
+        "endpoint" => "fake",
+        "user" => "fake",
+        "password" => "fake"
+      }
+    )
+  end  
 
-  let(:image) { double("image", :id => "i-bar", :name => "i-bar") }
-  let(:unique_name) { SecureRandom.uuid }
+  # download stemcell and place it in ./tmp/stemcells folder 
+  let(:stemcell_path) { ENV['BOSH_GOOGLE_STEMCELL_PATH'] || './tmp/stemcell.tar.gz' }
+
+
 
   before :each do
     @tmp_dir = Dir.mktmpdir
@@ -22,8 +49,8 @@ describe Bosh::Google::Cloud do
 
   describe "Image upload based flow" do
 
-    it "creates stemcell using a stemcell file" do
-
+    it "uploads image" do
+      cpi.create_stemcell(stemcell_path)
     end
 
   end

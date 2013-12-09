@@ -18,8 +18,8 @@ module Bosh::Google
     #
     # @param [Hash] options cloud options
     def initialize(options)
-      self.options = options.dup
-      self.logger  = Bosh::Clouds::Config.logger
+      @options = options.dup
+      @logger  = Bosh::Clouds::Config.logger
 
       validate_options
       initialize_registry
@@ -67,9 +67,9 @@ module Bosh::Google
     #
     # @return [String] opaque id later used by other methods of the CPI
     # TODO: how it should work ? 
-    def current_vm_id
-      not_implemented(:current_vm_id)
-    end
+    # def current_vm_id
+    #   not_implemented(:current_vm_id)
+    # end
 
     ##
     # Creates a stemcell
@@ -85,11 +85,11 @@ module Bosh::Google
         begin
           Dir.mktmpdir do |tmp_dir|
             @logger.info("Creating new image...")
-            directory_name = "bosh-stemcells-#{generate_unique_name_from_email}"
+            directory_name = stemcell_directory_name
             image_name     = "bosh-#{File.basename(image_path)}-#{generate_unique_name}"
                         
             # check if folder exists and has access
-            direcrtory = @storage.directories.get(directory_name)
+            direcrtory = remote { @storage.directories.get(directory_name) }
             if direcrtory.nil?
               remote do 
                 direcrtory = @storage.directories.new
@@ -138,7 +138,11 @@ module Bosh::Google
     # @param [String] stemcell stemcell id that was once returned by {#create_stemcell}
     # @return [void]
     def delete_stemcell(stemcell_id)
-      not_implemented(:delete_stemcell)
+      # TODO: do I need to remove blob here ?
+      remote do 
+        stemcell_image = compute.images.find { |image| image.id == stemcell_id } 
+        stemcell_image.destroy
+      end
     end
 
     ##
