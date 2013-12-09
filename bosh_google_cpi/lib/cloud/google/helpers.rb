@@ -30,14 +30,17 @@ module Bosh::Google
     def stemcell_directory
       # check if folder exists and has access
       # TODO: what to do if DeniedAccess is thrown
+      @logger.info("Connecting to stemcell directory (#{stemcell_directory_name})...")
       direcrtory = remote { @storage.directories.get(stemcell_directory_name) }
       if direcrtory.nil?
+        @logger.info("Creating directory (#{stemcell_directory_name})...")
         remote do 
           direcrtory = @storage.directories.new
           direcrtory.key = stemcell_directory_name
           direcrtory.save
         end
-      end      
+      end
+      direcrtory
     end
     
   #   ##

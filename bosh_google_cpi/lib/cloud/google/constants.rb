@@ -6,6 +6,10 @@ module Bosh::Google
       2
     end
 
+    def image_root_file
+      'disk.raw'
+    end
+
   end
 
 end

@@ -19,7 +19,8 @@ module Bosh::Google
     # @param [Hash] options cloud options
     def initialize(options)
       @options = options.dup
-      @logger  = Bosh::Clouds::Config.logger
+      @logger  = Bosh::Clouds::Config.logger 
+
 
       validate_options
       initialize_registry
@@ -34,14 +35,17 @@ module Bosh::Google
         :provider => 'google',
         :google_client_email => @google_properties['compute']['client_email'],
         :google_key_location => @google_properties['compute']['key_location'],
-        :google_project      => @google_properties['compute']['project'],
+        :google_project      => @google_properties['compute']['project']
       }
 
+      
       begin
+        @logger.info("Connecting to Compute...")
         @compute = Fog::Compute.new(compute_params)
       rescue Exception => e
         @logger.error(e)
-        cloud_error("Unable to connect to the OpenStack Compute API. Check task debug log for details.")  
+        # TODO:  Ask to scpecify params ! or validations
+        cloud_error("Unable to connect to the Google Compute API. Check task debug log for details.")
       end
 
       storage_params = {
@@ -51,10 +55,11 @@ module Bosh::Google
       }
 
       begin
+        @logger.info("Connecting to Storage...")        
         @storage = Fog::Storage.new(storage_params)
       rescue Exception => e
         @logger.error(e)
-        cloud_error("Unable to connect to the OpenStack Image Service API. Check task debug log for details.")
+        cloud_error("Unable to connect to the Google Storage Service API. Check task debug log for details.")
       end
 
       @metadata_lock = Mutex.new
@@ -80,7 +85,10 @@ module Bosh::Google
     # @return [String] opaque id later used by {#create_vm} and {#delete_stemcell}
     # 
     # I assume here that image_path contains path to the file
-    def create_stemcell(image_path, _)
+    def create_stemcell(image_path, _ = nil)
+      @logger.info("Creating stemcell from #{image_path}...")
+      # TODO: maybe we don't need to generate new image every time ? maybe we can check check sum
+      # TODO: check if we can push tar.gz
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
           Dir.mktmpdir do |tmp_dir|
@@ -88,39 +96,35 @@ module Bosh::Google
             directory_name = stemcell_directory_name
             image_name     = "bosh-#{File.basename(image_path)}-#{generate_unique_name}"
                         
-            # check if folder exists and has access
-            direcrtory = remote { @storage.directories.get(directory_name) }
-            if direcrtory.nil?
-              remote do 
-                direcrtory = @storage.directories.new
-                direcrtory.key = directory_name
-                direcrtory.save
-              end
-            end
-            
             # If image_path is set to existing file, then 
             # from the remote location on a background job and store it in its repository.
             # Otherwise, unpack image to temp directory and upload to Glance the root image.
 
             @logger.info("Extracting stemcell file to `#{tmp_dir}'...")
             unpack_image(tmp_dir, image_path)
-            image_file = File.join(tmp_dir, "root.img")
+            image_file = File.join(tmp_dir, image_root_file)
 
             file = nil
-            remote do 
-              file = directory.files.new
-              file.key = image_name
-              file.body = File.open(image_file, 'r')
-              file.save
+            remote do
+              # file = stemcell_directory.files.new
+              # file.key  = image_name
+              # file.body = File.open(image_file, 'r')
+              # @logger.info("Uploading image file #{image_name} into Google Storage...")
+              # file.save
+
+              file = stemcell_directory.files.to_a.find { |f| f.key == "bosh-google-stemcell.tar.gz-89d57cde7777e11dccf0a599c7328f7e" }
+
             end
 
             remote do 
+              @logger.info("Create new image..")
               image = compute.images.new
-              image.key = image_name
-              image.raw_disk = file.url
+              image.name = image_name
+              image.raw_disk = file.url(60*15)
               image.save              
             end
 
+            @logger.info("Wait resource..")
             wait_resource(image, :active)
             
             image.id.to_s
