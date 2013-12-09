@@ -22,7 +22,23 @@ module Bosh::Google
       self.options['google']['compute']['client_email']
     end
 
+    def stemcell_directory_name
+      @stemcell_directory_name ||= "bosh-stemcells-#{generate_unique_name_from_email}"
+    end
 
+
+    def stemcell_directory
+      # check if folder exists and has access
+      # TODO: what to do if DeniedAccess is thrown
+      direcrtory = remote { @storage.directories.get(stemcell_directory_name) }
+      if direcrtory.nil?
+        remote do 
+          direcrtory = @storage.directories.new
+          direcrtory.key = stemcell_directory_name
+          direcrtory.save
+        end
+      end      
+    end
     
   #   ##
   #   # Checks if options passed to CPI are valid and can actually
