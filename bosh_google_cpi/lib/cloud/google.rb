@@ -10,6 +10,8 @@ require "common/thread_pool"
 require "common/thread_formatter"
 
 require "fog"
+require "google/api_client"
+
 require "cloud"
 require "cloud/google/common_helpers"
 require "cloud/google/helpers"
