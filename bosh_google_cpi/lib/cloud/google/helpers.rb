@@ -43,6 +43,39 @@ module Bosh::Google
       direcrtory
     end
     
+
+    def authenticate_google_compute(options)
+
+      api_version   = 'v1'
+      base_url      = 'https://www.googleapis.com/compute/'
+      api_scope_url = 'https://www.googleapis.com/auth/compute'
+      
+      google_client_email = options[:google_client_email]
+      @api_url            = base_url + api_version + '/projects/'
+
+      google_client_email = options[:google_client_email]
+
+      key = Google::APIClient::KeyUtils.load_from_pkcs12(File.expand_path(options[:google_key_location]), 'notasecret')
+
+      @google_client = ::Google::APIClient.new({
+        :application_name => "bosh_google_cpi",
+        :application_version => Bosh::Clouds::VERSION
+      })
+
+      @google_client.authorization = Signet::OAuth2::Client.new({
+        :audience => 'https://accounts.google.com/o/oauth2/token',
+        :auth_provider_x509_cert_url => "https://www.googleapis.com/oauth2/v1/certs",
+        :client_x509_cert_url => "https://www.googleapis.com/robot/v1/metadata/x509/#{google_client_email}",
+        :issuer => google_client_email,
+        :scope => api_scope_url,
+        :signing_key => key,
+        :token_credential_uri => 'https://accounts.google.com/o/oauth2/token',
+      })
+      @google_client.authorization.fetch_access_token!
+      @google_compute = @google_client.discovered_api('compute', api_version)
+      
+    end
+
   #   ##
   #   # Checks if options passed to CPI are valid and can actually
   #   # be used to create all required data structures etc.

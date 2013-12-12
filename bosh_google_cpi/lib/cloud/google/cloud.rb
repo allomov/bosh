@@ -94,7 +94,8 @@ module Bosh::Google
           Dir.mktmpdir do |tmp_dir|
             @logger.info("Creating new image...")
             directory_name = stemcell_directory_name
-            image_name     = "bosh-#{File.basename(image_path)}-#{generate_unique_name}"
+            # image_name     = "bosh-#{File.basename(image_path)}-#{generate_unique_name}"
+            image_name = "bosh-google-stemcell.tar.gz-89d57cde7777e11dccf0a599c7328f7e"
                         
             # If image_path is set to existing file, then 
             # from the remote location on a background job and store it in its repository.
@@ -112,12 +113,13 @@ module Bosh::Google
               # @logger.info("Uploading image file #{image_name} into Google Storage...")
               # file.save
 
-              file = stemcell_directory.files.to_a.find { |f| f.key == "bosh-google-stemcell.tar.gz-89d57cde7777e11dccf0a599c7328f7e" }
+              file = stemcell_directory.files.to_a.find { |f| f.key == image_name }
 
             end
 
             remote do 
               @logger.info("Create new image..")
+              
               image = compute.images.new
               image.name = image_name
               image.raw_disk = file.url(60*15)
@@ -187,7 +189,6 @@ module Bosh::Google
     #                  {#detach_disk}, and {#delete_vm}
     def create_vm(agent_id, stemcell_id, resource_pool,
                   networks, disk_locality = nil, env = nil)
-
       with_thread_name("create_vm(#{agent_id}, ...)") do
         @logger.info("Creating new server...")
         remote do
