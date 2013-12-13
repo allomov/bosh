@@ -27,4 +27,7 @@ Gem::Specification.new do |s|
   s.add_dependency 'bosh-registry', "~>#{version}"
   s.add_dependency 'httpclient', '=2.2.4'
   s.add_dependency 'yajl-ruby', '>=0.8.2'
+
+  # remove after updating fog version upper to 1.18
+  s.add_dependency 'mime-types', '>=0.8.2'
 end

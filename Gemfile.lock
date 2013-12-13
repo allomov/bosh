@@ -196,6 +196,7 @@ PATH
       fog (= 1.14.0)
       google-api-client (~> 0.6.4)
       httpclient (= 2.2.4)
+      mime-types (>= 0.8.2)
       yajl-ruby (>= 0.8.2)
 
 PATH

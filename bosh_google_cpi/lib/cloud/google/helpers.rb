@@ -26,6 +26,9 @@ module Bosh::Google
       @stemcell_directory_name ||= "bosh-stemcells-#{generate_unique_name_from_email}"
     end
 
+    def stemcell_image_name(image_path)
+      File.basename(image_path, '.*').tr('^A-Za-z0-9', '') + generate_unique_name[0..6]
+    end
 
     def stemcell_directory
       # check if folder exists and has access

@@ -66,7 +66,65 @@ module Bosh::Google
       unless File.exists?(root_image)
         cloud_error("Root image is missing from stemcell archive.")
       end
-    end    
+    end  
+
+    DEFAULT_STATE_TIMEOUT = 60
+
+    def wait_resource(resource, target_state, state_method = :status, allow_notfound = false)
+      started_at = Time.now
+      desc = resource.class.name.split("::").last.to_s + " `" + resource.id.to_s + "'"
+      target_state = Array(target_state)
+      state_timeout = @state_timeout || DEFAULT_STATE_TIMEOUT
+
+      loop do
+        task_checkpoint
+
+        duration = Time.now - started_at
+
+        if duration > state_timeout
+          cloud_error("Timed out waiting for #{desc} to be #{target_state.join(", ")}")
+        end
+
+        if @logger
+          @logger.debug("Waiting for #{desc} to be #{target_state.join(", ")} (#{duration}s)")
+        end
+
+        # If resource reload is nil, perhaps it's because resource went away
+        # (ie: a destroy operation). Don't raise an exception if this is
+        # expected (allow_notfound).
+        @logger.info resource.inspect
+        if remote { resource.reload.nil? }
+          break if allow_notfound
+          cloud_error("#{desc}: Resource not found")
+        else
+          @logger.info resource.inspect
+          state =  remote { resource.send(state_method).downcase.to_sym }
+        end
+
+        # This is not a very strong convention, but some resources
+        # have 'error', 'failed' and 'killed' states, we probably don't want to keep
+        # waiting if we're in these states. Alternatively we could introduce a
+        # set of 'loop breaker' states but that doesn't seem very helpful
+        # at the moment
+        if state == :failed
+          cloud_error("#{desc} state is #{state}, expected #{target_state.join(", ")}")
+        end
+
+        break if target_state.include?(state)
+
+        sleep(1)
+      end
+
+      if @logger
+        total = Time.now - started_at
+        @logger.info("#{desc} is now #{target_state.join(", ")}, took #{total}s")
+      end
+    end  
+
+
+    def task_checkpoint
+      Bosh::Clouds::Config.task_checkpoint
+    end
 
 
   end
