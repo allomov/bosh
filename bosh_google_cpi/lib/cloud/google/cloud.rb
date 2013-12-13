@@ -1,3 +1,5 @@
+require 'debugger'
+
 module Bosh::Google
 
   class Cloud < Bosh::Cloud
@@ -91,46 +93,53 @@ module Bosh::Google
       # TODO: check if we can push tar.gz
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
-          Dir.mktmpdir do |tmp_dir|
             @logger.info("Creating new image...")
             directory_name = stemcell_directory_name
-            # image_name     = "bosh-#{File.basename(image_path)}-#{generate_unique_name}"
-            image_name = "bosh-google-stemcell.tar.gz-89d57cde7777e11dccf0a599c7328f7e"
+            # image_name     = stemcell_image_name(image_path)
+
+            image_name = "googlestemcelltard7cd1e7"
                         
             # If image_path is set to existing file, then 
             # from the remote location on a background job and store it in its repository.
             # Otherwise, unpack image to temp directory and upload to Glance the root image.
 
-            @logger.info("Extracting stemcell file to `#{tmp_dir}'...")
-            unpack_image(tmp_dir, image_path)
-            image_file = File.join(tmp_dir, image_root_file)
-
+            # Dir.mktmpdir do |tmp_dir|
+            #   @logger.info("Extracting stemcell file to `#{tmp_dir}'...")
+            #   unpack_image(tmp_dir, image_path)
+            #   image_file = File.join(tmp_dir, image_root_file)
+            # end
+            
             file = nil
             remote do
               # file = stemcell_directory.files.new
               # file.key  = image_name
-              # file.body = File.open(image_file, 'r')
+              # file.body = File.open(image_path, 'r')
               # @logger.info("Uploading image file #{image_name} into Google Storage...")
               # file.save
-
               file = stemcell_directory.files.to_a.find { |f| f.key == image_name }
-
             end
 
+            debugger
+            @logger.info("Create new image..")
+            image = compute.images.new
+            image.name = image_name + 'new'
+             image.raw_disk = "gs://#{stemcell_directory_name}/#{image_name}"
+            # image.raw_disk = "https://storage.cloud.google.com/#{stemcell_directory_name}/#{image_name}"
+            # image.raw_disk = file.url(15*60)
+            @logger.info image.inspect
+
             remote do 
-              @logger.info("Create new image..")
-              
-              image = compute.images.new
-              image.name = image_name
-              image.raw_disk = file.url(60*15)
               image.save              
             end
 
+            @logger.info("!!!image.." + image.inspect)
+
             @logger.info("Wait resource..")
-            wait_resource(image, :active)
+
+            wait_resource(image, :ready)
             
             image.id.to_s
-          end
+          
         rescue => e
           @logger.error(e)
           raise e

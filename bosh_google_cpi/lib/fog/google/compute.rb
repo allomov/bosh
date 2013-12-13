@@ -76,7 +76,7 @@ module Fog
 
         def shared_initialize(options = {})
           @project = options[:google_project]
-          @api_version = 'v1beta16'
+          @api_version = 'v1'
         end
 
         def build_excon_response(body, status=200)

@@ -47,12 +47,6 @@ describe Bosh::Google::Cloud do
   # download stemcell and place it in ./tmp/stemcells folder 
   let(:stemcell_path) { ENV['BOSH_GOOGLE_STEMCELL_PATH'] || './tmp/stemcell.tar.gz' }
 
-
-
-  before :each do
-    @tmp_dir = Dir.mktmpdir
-  end
-
   describe "Image upload based flow" do
 
     it "uploads image" do
