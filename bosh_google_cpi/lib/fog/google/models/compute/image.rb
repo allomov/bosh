@@ -49,7 +49,7 @@ module Fog
 
           options = { 'description'     => description }
 
-          service.insert_image(name, options)
+          service.insert_image(name, raw_disk, options)
 
           # data = service.backoff_if_unfound {
           #   service.get_image(self.name).body
