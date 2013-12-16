@@ -1,5 +1,3 @@
-require 'debugger'
-
 module Bosh::Google
 
   class Cloud < Bosh::Cloud
@@ -119,12 +117,14 @@ module Bosh::Google
               file = stemcell_directory.files.to_a.find { |f| f.key == image_name }
             end
 
-            debugger
             @logger.info("Create new image..")
             image = compute.images.new
-            image.name = image_name + 'new'
-             image.raw_disk = "gs://#{stemcell_directory_name}/#{image_name}"
+            image.name = image_name
+            # image.raw_disk = "gs://#{stemcell_directory_name}/#{image_name}"
             # image.raw_disk = "https://storage.cloud.google.com/#{stemcell_directory_name}/#{image_name}"
+            image.raw_disk = "https://storage.googleapis.com/#{stemcell_directory_name}/#{image_name}"
+            # image.raw_disk = "https://#{stemcell_directory_name}.storage.googleapis.com/#{image_name}"
+
             # image.raw_disk = file.url(15*60)
             @logger.info image.inspect
 
