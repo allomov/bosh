@@ -52,6 +52,8 @@ module Bosh::Stemcell
           openstack_stages
         when Infrastructure::Vsphere then
           operating_system.instance_of?(OperatingSystem::Centos) ? hacked_centos_vsphere : vsphere_stages
+        when Infrastructure::Gce then
+          gce_stages
       end
     end
 
@@ -160,5 +162,26 @@ module Bosh::Stemcell
         :stemcell
       ]
     end
+  end
+
+  def gce_stages
+    [
+      # Misc
+      :system_openstack_network,
+      :system_openstack_clock,
+      :system_openstack_modules,
+      :system_parameters,
+      # Finalisation,
+      :bosh_clean,
+      :bosh_harden,
+      :bosh_harden_ssh,
+      # Image/bootloader
+      :image_create,
+      :image_install_grub,
+      :image_openstack_qcow2,
+      :image_openstack_prepare_stemcell,
+      # Final stemcell
+      :stemcell_openstack
+    ]
   end
 end
