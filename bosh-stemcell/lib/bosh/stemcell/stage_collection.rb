@@ -178,7 +178,7 @@ module Bosh::Stemcell
       :image_create,
       :image_install_grub,
       :image_gce_raw,
-      :image_openstack_prepare_stemcell,
+      :image_gce_prepare_stemcell,
       # Final stemcell
       :stemcell_openstack
     ]
