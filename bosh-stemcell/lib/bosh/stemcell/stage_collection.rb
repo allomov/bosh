@@ -181,7 +181,7 @@ module Bosh::Stemcell
       :image_gce_raw,
       :image_gce_prepare_stemcell,
       # Final stemcell
-      :stemcell_openstack
+      :stemcell_gce
     ]
   end
 end
