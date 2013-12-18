@@ -88,6 +88,8 @@ module VSphereCloud
                                    cluster.datacenter.template_folder.mob)
           @logger.info('Waiting for NFC lease')
           state = wait_for_nfc_lease(lease)
+
+          raise_nfc_lease_error(lease) if state == Vim::HttpNfcLease::State::ERROR
           raise "Could not acquire HTTP NFC lease (state is: #{state})" unless state == Vim::HttpNfcLease::State::READY
 
           @logger.info('Uploading')
@@ -1125,15 +1127,27 @@ module VSphereCloud
     end
 
     def get_vms
-      vm_objects = []
+      subfolders = []
+      vms = []
       with_thread_name("get_vms") do
         @resources.datacenters.each_value do |datacenter|
-          @logger.info("Looking for VMs in: #{datacenter.name} - #{datacenter.vm_folder.mob}")
-
-          vm_objects += client.get_property(datacenter.vm_folder.mob, Vim::Folder, 'childEntity', ensure_all: true)
+          @logger.info("Looking for VMs in: #{datacenter.name} - #{datacenter.vm_folder.name}")
+          subfolders += datacenter.vm_folder.mob.child_entity
         end
       end
-      vm_objects
+
+      subfolders.each do |folder|
+        vms += folder.child_entity
+      end
+
+      vms
+    end
+
+    private
+
+    def raise_nfc_lease_error(lease)
+      error_message = client.get_property(lease, Vim::HttpNfcLease, 'error').msg
+      raise "Could not acquire HTTP NFC lease, message is:  #{error_message}"
     end
   end
 end

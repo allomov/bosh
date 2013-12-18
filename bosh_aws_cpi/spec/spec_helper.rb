@@ -45,7 +45,7 @@ def make_cloud(options = nil)
 end
 
 def mock_registry(endpoint = 'http://registry:3333')
-  registry = mock('registry', :endpoint => endpoint)
+  registry = double('registry', :endpoint => endpoint)
   Bosh::Registry::Client.stub(:new).and_return(registry)
   registry
 end
@@ -109,5 +109,8 @@ def asset(filename)
 end
 
 RSpec.configure do |config|
-  config.before(:each) { Bosh::Clouds::Config.stub(:logger).and_return(double.as_null_object)  }
+  config.before(:each) do
+    logger = double('evil global stub in spec_helper').as_null_object
+    Bosh::Clouds::Config.stub(:logger).and_return(logger)
+  end
 end

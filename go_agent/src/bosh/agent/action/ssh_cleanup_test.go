@@ -2,28 +2,29 @@ package action
 
 import (
 	boshassert "bosh/assert"
+	fakeplatform "bosh/platform/fakes"
+	fakesettings "bosh/settings/fakes"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-func TestSshCleanup(t *testing.T) {
-	settings, platform, blobstore, taskService := getFakeFactoryDependencies()
-	factory := NewFactory(settings, platform, blobstore, taskService)
-	sshAction := factory.Create("ssh")
+func TestSshRunCleanupDeletesEphemeralUser(t *testing.T) {
+	platform, action := buildSshActionCleanup()
 
 	payload := `{"arguments":["cleanup",{"user_regex":"^foobar.*"}]}`
-
-	response, err := sshAction.Run([]byte(payload))
+	response, err := action.Run([]byte(payload))
 	assert.NoError(t, err)
-
-	// assert on platform interaction
 	assert.Equal(t, "^foobar.*", platform.DeleteEphemeralUsersMatchingRegex)
 
-	// assert on the response
-
-	expectedJson := map[string]interface{}{
+	boshassert.MatchesJsonMap(t, response, map[string]interface{}{
 		"command": "cleanup",
 		"status":  "success",
-	}
-	boshassert.MatchesJsonMap(t, response, expectedJson)
+	})
+}
+
+func buildSshActionCleanup() (*fakeplatform.FakePlatform, sshAction) {
+	platform := fakeplatform.NewFakePlatform()
+	settings := &fakesettings.FakeSettingsService{}
+	action := newSsh(settings, platform)
+	return platform, action
 }

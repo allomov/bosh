@@ -84,9 +84,10 @@ describe 'AWS Bootstrap commands' do
         it 'passes the generated hm user to the new microbosh bootstrapper' do
           SecureRandom.stub(:base64).and_return('some_password')
           fake_bootstrap.stub(:create_user)
-          Bosh::Aws::MicroBoshBootstrap.should_receive(:new).with do |_, options|
+          Bosh::Aws::MicroBoshBootstrap.should_receive(:new) do |_, options|
             options[:hm_director_user].should == 'hm'
             options[:hm_director_password].should == 'some_password'
+            fake_bootstrap
           end
           aws.bootstrap_micro
         end
@@ -256,7 +257,7 @@ describe 'AWS Bootstrap commands' do
       before do
         Bosh::Cli::PackageBuilder.any_instance.stub(:resolve_globs).and_return([])
         mock_s3.should_receive(:copy_remote_file).with('bosh-jenkins-artifacts','bosh-stemcell/aws/light-bosh-stemcell-latest-aws-xen-ubuntu.tgz','bosh_stemcell.tgz').and_return(stemcell_stub)
-        mock_s3.should_receive(:copy_remote_file).with('bosh-jenkins-artifacts','release/bosh-3.tgz','bosh_release.tgz').and_return('bosh_release.tgz')
+        mock_s3.should_receive(:copy_remote_file).with('bosh-jenkins-artifacts', /release\/bosh-(\d+).tgz/,'bosh_release.tgz').and_return('bosh_release.tgz')
 
         aws.config.target = aws.options[:target] = 'http://127.0.0.1:25555'
         aws.config.set_alias('target', '1234', 'http://127.0.0.1:25555')
@@ -330,9 +331,9 @@ describe 'AWS Bootstrap commands' do
       end
 
       it 'generates an updated manifest for bosh' do
-        File.exist?('deployments/bosh/bosh.yml').should be_false
+        File.exist?('deployments/bosh/bosh.yml').should be(false)
         aws.bootstrap_bosh
-        File.exist?('deployments/bosh/bosh.yml').should be_true
+        File.exist?('deployments/bosh/bosh.yml').should be(true)
       end
 
       it 'runs deployment diff' do
