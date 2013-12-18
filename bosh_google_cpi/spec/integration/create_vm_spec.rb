@@ -50,10 +50,17 @@ describe Bosh::Google::Cloud do
   describe "Image upload based flow" do
 
     it "uploads image" do
-      stemcell_id = cpi.create_stemcell(stemcell_path)
-      # check if stemcell exists in google compute engine
-      cpi.delete_stemcell(stemcell_id)
-      # check if stemcell doesn't exist in google compute engine
+      cpi.create_vm(agent_id, stemcell_id, {'instance_type' => ''}, networks)
+      # check if VM exists 
+      cpi.has_vm?(vm_id)
+
+      cpi.set_vm_metadata(vm, metadata)
+      # check VM metadata
+      
+      cpi.reboot_vm(vm_id)
+      # check if rebooted 
+      cpi.delete_vm(vm_id)
+      
     end
 
   end

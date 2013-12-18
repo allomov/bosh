@@ -31,6 +31,7 @@ module Fog
           result = self.build_result(api_method,
                                      parameters,
                                      body_object)
+          
           response = self.build_response(result)
         end
 

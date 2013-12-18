@@ -120,21 +120,11 @@ module Bosh::Google
             @logger.info("Create new image..")
             image = compute.images.new
             image.name = image_name
-            # image.raw_disk = "gs://#{stemcell_directory_name}/#{image_name}"
-            # image.raw_disk = "https://storage.cloud.google.com/#{stemcell_directory_name}/#{image_name}"
             image.raw_disk = "https://storage.googleapis.com/#{stemcell_directory_name}/#{image_name}"
-            # image.raw_disk = "https://#{stemcell_directory_name}.storage.googleapis.com/#{image_name}"
-
-            # image.raw_disk = file.url(15*60)
-            @logger.info image.inspect
 
             remote do 
               image.save              
             end
-
-            @logger.info("!!!image.." + image.inspect)
-
-            @logger.info("Wait resource..")
 
             wait_resource(image, :ready)
             
@@ -202,7 +192,7 @@ module Bosh::Google
         @logger.info("Creating new server...")
         remote do
           server_name = "vm-#{generate_unique_name}"
-          flavor_name = resource_pool["instance_type"]
+          flavor_name = resource_pool["instance_type"] || 
           image        = remote { @compute.images.find  { |f| f.id == stemcell_id } }
           machine_type = remote { @compute.flavors.find { |f| f.name == flavor_name } }
           server = @compute.servers.new

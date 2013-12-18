@@ -49,11 +49,13 @@ module Fog
 
           options = { 'description'     => description }
 
-          service.insert_image(name, raw_disk, options)
+          operation = service.insert_image(name, raw_disk, options)
 
-          # data = service.backoff_if_unfound {
-          #   service.get_image(self.name).body
-          # }
+          puts "Fog::Image#save -> operation: " + operation.inspect
+
+          data = service.backoff_if_unfound {
+            service.get_image(self.name).body
+          }
 
           # Track the name of the project in which we insert the image
           # data.merge!('project' => service.project)
