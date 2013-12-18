@@ -76,10 +76,16 @@ module Bosh::Google
       target_state = Array(target_state)
       state_timeout = @state_timeout || DEFAULT_STATE_TIMEOUT
 
+      @logger.info("Wait resource..")
+      @logger.info("Description #{desc}..")
+      @logger.info "Resource -> " + resource.inspect
+      @logger.info("Started at #{started_at}.")
+
       loop do
         task_checkpoint
 
         duration = Time.now - started_at
+        @logger.info("Duration #{duration}..")
 
         if duration > state_timeout
           cloud_error("Timed out waiting for #{desc} to be #{target_state.join(", ")}")
@@ -92,8 +98,9 @@ module Bosh::Google
         # If resource reload is nil, perhaps it's because resource went away
         # (ie: a destroy operation). Don't raise an exception if this is
         # expected (allow_notfound).
-        @logger.info resource.inspect
+        
         if remote { resource.reload.nil? }
+          @logger.info("Resource reload is nil.")
           break if allow_notfound
           cloud_error("#{desc}: Resource not found")
         else
@@ -123,6 +130,7 @@ module Bosh::Google
 
 
     def task_checkpoint
+      @logger.info("task_checkpoint..")
       Bosh::Clouds::Config.task_checkpoint
     end
 

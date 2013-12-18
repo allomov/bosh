@@ -119,6 +119,10 @@ module Fog
 
           self.add_ssh_key(self.username, self.public_key) if self.public_key
 
+          # 'g1-small'
+
+          
+
           options = {
               'image' => image_name,
               'machineType' => machine_type,
