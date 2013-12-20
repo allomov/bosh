@@ -113,9 +113,6 @@ module Fog
           result
         end
 
-        # def wait
-        # end
-
       end
 
       class Mock

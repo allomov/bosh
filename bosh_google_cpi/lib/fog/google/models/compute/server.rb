@@ -124,6 +124,7 @@ module Fog
           self.add_ssh_key(self.username, self.public_key) if self.public_key
 
           # 'g1-small' default ???
+          # validate machine types ???
 
           options = {
               'image' => image_name,
@@ -141,13 +142,12 @@ module Fog
 
           # response.body ???
           # handle errors in response.error ???
+          # maybe do it in another thread ???
           operation = service.operations.new(response)
-
-          # maybe do it async ???
-          service.wait_operation(operation)
+          operation.wait
           
           # check if service is available
-          data = service.backoff_if_unfound {service.get_server(self.name, self.zone_name).body}
+          data = service.backoff_if_unfound { service.get_server(self.name, self.zone_name).body }
 
           # service.servers.merge_attributes(data)
           self.merge_attributes(data)
