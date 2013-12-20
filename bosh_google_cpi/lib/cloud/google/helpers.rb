@@ -18,6 +18,10 @@ module Bosh::Google
       SecureRandom.hex
     end
 
+    def generate_timestamp
+      Time.now.strftime('-%Y%m%d-%6N')
+    end
+
     def client_email
       self.options['google']['compute']['client_email']
     end
@@ -26,11 +30,16 @@ module Bosh::Google
       @stemcell_directory_name ||= "bosh-stemcells-#{generate_unique_name_from_email}"
     end
 
-    def stemcell_image_name(image_path)
-      File.basename(image_path, '.*').tr('^A-Za-z0-9\-', '') + Time.now.strftime('-%Y%m%d-%6N')
+    def generate_stemcell_name(options = {})
+      image = options[:from] || 'stemcell'
+      File.basename(image, '.*').tr('^A-Za-z0-9\-', '') + '-' + generate_timestamp
     end
 
-    def stemcell_directory
+    def generate_vm_name
+      File.basename(image_path, '.*').tr('^A-Za-z0-9\-', '') + '-' + generate_timestamp
+    end    
+
+    def generate_stemcell_directory_name
       # check if folder exists and has access
       # TODO: what to do if DeniedAccess is thrown
       @logger.info("Connecting to stemcell directory (#{stemcell_directory_name})...")
@@ -123,6 +132,10 @@ module Bosh::Google
   #                                            registry_user,
   #                                            registry_password)
   #   end    
+
+    def find_server_by_id(vm_id)
+      @compute.servers.find { |server| server.id == vm_id }
+    end
 
   end
 

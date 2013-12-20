@@ -92,10 +92,11 @@ module Bosh::Google
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
             @logger.info("Creating new image...")
-            directory_name = stemcell_directory_name
+            stemcell_directory = generate_stemcell_directory_name
             # image_name     = stemcell_image_name(image_path)
 
             image_name = "googlestemcelltard7cd1e7"
+
                         
             # If image_path is set to existing file, then 
             # from the remote location on a background job and store it in its repository.
@@ -119,14 +120,14 @@ module Bosh::Google
 
             @logger.info("Create new image..")
             raw_disk_url = "https://storage.googleapis.com/#{stemcell_directory_name}/#{image_name}"
-            image = compute.images.new(name: stemcell_image_name(image_path), raw_disk: raw_disk_url)
+            image = compute.images.new(name: generate_stemcell_name(from: image_path), raw_disk: raw_disk_url)
 
             remote { image.save }
 
+            # is it needed ??? 
             wait_resource(image, :ready)
             
             image.id.to_s
-          
         rescue => e
           @logger.error(e)
           raise e
@@ -188,15 +189,12 @@ module Bosh::Google
       with_thread_name("create_vm(#{agent_id}, ...)") do
         @logger.info("Creating new server...")
         remote do
-          server_name = "vm-#{generate_unique_name}"
-          flavor_name = resource_pool["instance_type"] || 
+          server_name  = "vm-#{generate_timestamp}"
           image        = remote { @compute.images.find  { |f| f.id == stemcell_id } }
-          machine_type = remote { @compute.flavors.find { |f| f.name == flavor_name } }
-          server = @compute.servers.new
-          server.name = server_name
-          server.machine_type = machine_type
-          server.image = image
-          server.save
+          machine_type = resource_pool["machine_type"] || resource_pool["instance_type"]
+          # machine_type = remote { @compute.flavors.find { |f| f.name == flavor_name } }
+          server = @compute.servers.new(name: server_name, machine_type: machine_type, image: image.name)
+          remote { server.save }
         end
       end
 
@@ -208,7 +206,9 @@ module Bosh::Google
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @return [void]
     def delete_vm(vm_id)
-      not_implemented(:delete_vm)
+      remote do
+        find_server_by_id(vm_id).delete
+      end
     end
 
     ##
@@ -217,7 +217,9 @@ module Bosh::Google
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @return [Boolean] True if the vm exists
     def has_vm?(vm_id)
-      not_implemented(:has_vm?)
+      remote do
+        !!find_server_by_id(vm_id)
+      end
     end
 
     ##
@@ -227,7 +229,9 @@ module Bosh::Google
     # @param [Optional, Hash] CPI specific options (e.g hard/soft reboot)
     # @return [void]
     def reboot_vm(vm_id)
-      not_implemented(:reboot_vm)
+      remote do
+        find_server_by_id(vm_id).reset
+      end
     end
 
     ##
@@ -239,7 +243,9 @@ module Bosh::Google
     # @param [Hash] metadata metadata key/value pairs
     # @return [void]
     def set_vm_metadata(vm, metadata)
-      not_implemented(:set_vm_metadata)
+      remote do
+        server = find_server_by_id(vm_id)
+      end
     end
 
     ##
@@ -263,7 +269,9 @@ module Bosh::Google
     #                           be attached to
     # @return [String] opaque id later used by {#attach_disk}, {#detach_disk}, and {#delete_disk}
     def create_disk(size, vm_locality = nil)
-      not_implemented(:create_disk)
+      remote do
+        
+      end
     end
 
     ##
@@ -273,7 +281,9 @@ module Bosh::Google
     # @param [String] disk disk id that was once returned by {#create_disk}
     # @return [void]
     def delete_disk(disk_id)
-      not_implemented(:delete_disk)
+      remote do
+        
+      end
     end
 
     ##
@@ -283,7 +293,9 @@ module Bosh::Google
     # @param [String] disk disk id that was once returned by {#create_disk}
     # @return [void]
     def attach_disk(vm_id, disk_id)
-      not_implemented(:attach_disk)
+      remote do
+        
+      end
     end
 
     # Take snapshot of disk

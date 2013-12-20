@@ -37,26 +37,12 @@ module Fog
           self
         end
 
-
         # wait until operation will have desired status
-        def wait(target_status = :done)
-          started_at  = Time.now
-          default_timeout = 60 * 10
-
-          loop do
-            duration = Time.now - started_at
-
-            if duration > default_timeout
-              raise "Timed out waiting for #{name}##{id} operation to be #{target_status}."
-            end
-
+        def wait(target_status = :done, &block)
+          Fog.wait_for do
             self.reload
-
-            yield(self) if block_given?
-
-            break if target_status == status.downcase.to_sym
-
-            sleep(1)
+            block.call(self) unless block.nil?
+            target_status == self.status.downcase.to_sym
           end
         end
 

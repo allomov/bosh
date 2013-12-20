@@ -154,6 +154,22 @@ module Fog
           self
         end
 
+        def reset 
+          response = service.reset_server(name, zone_name)
+
+          # handle errors in response.error ???
+          # maybe do it in another thread ???
+          operation = service.operations.new(response.body)
+          operation.wait
+
+          # check if server is available
+          data = service.backoff_if_unfound { service.get_server(self.name, self.zone_name).body }
+
+          # service.servers.merge_attributes(data)
+          self.merge_attributes(data)
+          self          
+        end
+
       end
     end
   end
