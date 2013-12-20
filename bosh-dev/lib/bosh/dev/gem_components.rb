@@ -28,6 +28,7 @@ module Bosh::Dev
        bosh-stemcell
        bosh_agent
        bosh_aws_cpi
+       bosh_google_cpi
        bosh_cli
        bosh_cli_plugin_aws
        bosh_cli_plugin_micro
