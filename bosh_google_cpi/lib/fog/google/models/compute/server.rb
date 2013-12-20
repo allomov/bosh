@@ -146,7 +146,7 @@ module Fog
           operation = service.operations.new(response)
           operation.wait
           
-          # check if service is available
+          # check if server is available
           data = service.backoff_if_unfound { service.get_server(self.name, self.zone_name).body }
 
           # service.servers.merge_attributes(data)

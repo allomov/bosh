@@ -46,7 +46,7 @@ module Fog
             duration = Time.now - started_at
 
             if duration > default_timeout
-              raise "Timed out waiting for #{desc} to be #{target_state.join(", ")}"
+              raise "Timed out waiting for #{name}##{id} operation to be #{target_state}."
             end
 
             self.reload
