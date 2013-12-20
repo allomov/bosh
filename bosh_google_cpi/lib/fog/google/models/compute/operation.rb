@@ -34,7 +34,6 @@ module Fog
           self.merge_attributes(new_attributes)
           self
         end
-        alias_method :reload!, :reload
 
         PENDING_STATE = "PENDING"
         RUNNING_STATE = "RUNNING"

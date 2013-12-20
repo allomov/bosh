@@ -108,6 +108,10 @@ module Fog
           self.merge_attributes(data)
         end
 
+        def machine_type_url
+          "http://www.googleapis.com/compute/v1/projects/#{project}/global/machineTypes/#{machine_type}"
+        end
+
         def save
           requires :name
           requires :machine_type
@@ -119,13 +123,11 @@ module Fog
 
           self.add_ssh_key(self.username, self.public_key) if self.public_key
 
-          # 'g1-small'
-
-          
+          # 'g1-small' default ???
 
           options = {
               'image' => image_name,
-              'machineType' => machine_type,
+              'machineType' => machine_type_url,
               'networkInterfaces' => network_interfaces,
               'network' => network,
               'externalIp' => external_ip,
@@ -135,10 +137,22 @@ module Fog
               'tags' => tags
           }.delete_if {|key, value| value.nil?}
 
-          service.insert_server(name, zone_name, options)
+          response = service.insert_server(name, zone_name, options)
+
+          # response.body ???
+          # handle errors in response.error ???
+          operation = service.operations.new(response)
+
+          # maybe do it async ???
+          service.wait_operation(operation)
+          
+          # check if service is available
           data = service.backoff_if_unfound {service.get_server(self.name, self.zone_name).body}
 
-          service.servers.merge_attributes(data)
+          # service.servers.merge_attributes(data)
+          self.merge_attributes(data)
+
+          self
         end
 
       end
