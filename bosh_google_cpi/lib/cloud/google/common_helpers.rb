@@ -70,6 +70,17 @@ module Bosh::Google
 
     DEFAULT_STATE_TIMEOUT = 60
 
+    def wait_operation(operation, target_state = :done, &block)
+      # convert operation to operation object if it is string ID
+      loop do 
+        operation.reload
+
+        yield(operation) if block_given?
+      end
+
+    end
+
+
     def wait_resource(resource, target_state, state_method = :status, allow_notfound = false)
       started_at = Time.now
       desc = resource.class.name.split("::").last.to_s + " `" + resource.id.to_s + "'"

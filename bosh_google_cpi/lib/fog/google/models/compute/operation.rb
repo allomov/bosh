@@ -13,7 +13,9 @@ module Fog
         attribute :creation_timestamp, :aliases => 'creationTimestamp'
         attribute :zone_name, :aliases => 'zone'
         attribute :status, :aliases => 'status'
+        attribute :status_message, :aliases => 'statusMessage'
         attribute :self_link, :aliases => 'selfLink'
+        attribute :error, :aliases => 'error'
 
         def ready?
           self.status == DONE_STATE
@@ -24,13 +26,15 @@ module Fog
         end
 
         def reload
-          requires :identity
+          requires :id
 
-          data = collection.get(identity, zone)
+          data = collection.get(id, zone)
+
           new_attributes = data.attributes
-          merge_attributes(new_attributes)
+          self.merge_attributes(new_attributes)
           self
         end
+        alias_method :reload!, :reload
 
         PENDING_STATE = "PENDING"
         RUNNING_STATE = "RUNNING"
