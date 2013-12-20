@@ -49,7 +49,8 @@ module Fog
 
           options = { 'description'     => description }
 
-          operation = service.insert_image(name, raw_disk, options)
+          response = service.insert_image(name, raw_disk, options)
+          operation = service.operations.new(response.body)
 
           puts "Fog::Image#save -> operation: " + operation.inspect
 

@@ -140,10 +140,9 @@ module Fog
 
           response = service.insert_server(name, zone_name, options)
 
-          # response.body ???
           # handle errors in response.error ???
           # maybe do it in another thread ???
-          operation = service.operations.new(response)
+          operation = service.operations.new(response.body)
           operation.wait
           
           # check if server is available

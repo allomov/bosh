@@ -118,13 +118,10 @@ module Bosh::Google
             end
 
             @logger.info("Create new image..")
-            image = compute.images.new
-            image.name = image_name
-            image.raw_disk = "https://storage.googleapis.com/#{stemcell_directory_name}/#{image_name}"
+            raw_disk_url = "https://storage.googleapis.com/#{stemcell_directory_name}/#{image_name}"
+            image = compute.images.new(name: image_name, raw_disk: raw_disk_url)
 
-            remote do 
-              image.save              
-            end
+            remote { image.save }
 
             wait_resource(image, :ready)
             
