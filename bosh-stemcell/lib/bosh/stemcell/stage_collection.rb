@@ -161,26 +161,26 @@ module Bosh::Stemcell
         :stemcell
       ]
     end
-  end
 
-  def gce_stages
-    [
-      # Misc
-      :system_openstack_network,
-      :system_openstack_clock,
-      :system_openstack_modules,
-      :system_parameters,
-      # Finalisation,
-      :bosh_clean,
-      :bosh_harden,
-      :bosh_harden_ssh,
-      # Image/bootloader
-      :image_create,
-      :image_install_grub,
-      :image_gce_raw,
-      :image_gce_prepare_stemcell,
-      # Final stemcell
-      :stemcell_gce
-    ]
+    def gce_stages
+      [
+        # Misc
+        :system_openstack_network,
+        :system_openstack_clock,
+        :system_openstack_modules,
+        :system_parameters,
+        # Finalisation,
+        :bosh_clean,
+        :bosh_harden,
+        :bosh_harden_ssh,
+        # Image/bootloader
+        :image_create,
+        :image_install_grub,
+        :image_gce_raw,
+        :image_gce_prepare_stemcell,
+        # Final stemcell
+        :stemcell_gce
+      ]
+    end
   end
 end
