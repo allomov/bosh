@@ -77,8 +77,8 @@ module Fog
         def delete
           requires :name
 
-          service.delete_image(name)
-          
+          response = service.delete_image(name)
+
           operation = service.operations.new(response.body)
           operation.wait          
         end

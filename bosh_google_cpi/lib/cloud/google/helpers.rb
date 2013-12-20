@@ -27,7 +27,7 @@ module Bosh::Google
     end
 
     def stemcell_image_name(image_path)
-      File.basename(image_path, '.*').tr('^A-Za-z0-9', '') + generate_unique_name[0..6]
+      File.basename(image_path, '.*').tr('^A-Za-z0-9\-', '') + Time.now.strftime('-%Y%m%d-%6N')
     end
 
     def stemcell_directory

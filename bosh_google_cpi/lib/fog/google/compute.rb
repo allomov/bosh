@@ -835,7 +835,6 @@ module Fog
         end
 
         def build_result(api_method, parameters, body_object=nil)
-          # Fog::Logger.warning body_object.inspect
           if body_object
             result = @client.execute(
               :api_method => api_method,
@@ -850,8 +849,6 @@ module Fog
           end
         end
 
-        # result = Google::APIClient::Result
-        # returns Excon::Response
         def build_response(result)
           build_excon_response(result.body.nil? ? nil : Fog::JSON.decode(result.body), result.status)
         end

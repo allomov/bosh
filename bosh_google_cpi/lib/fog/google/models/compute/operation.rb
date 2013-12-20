@@ -38,8 +38,8 @@ module Fog
         end
 
 
-        # wait until operation will have desired state
-        def wait(target_state = :done)
+        # wait until operation will have desired status
+        def wait(target_status = :done)
           started_at  = Time.now
           default_timeout = 60 * 10
 
@@ -47,14 +47,14 @@ module Fog
             duration = Time.now - started_at
 
             if duration > default_timeout
-              raise "Timed out waiting for #{name}##{id} operation to be #{target_state}."
+              raise "Timed out waiting for #{name}##{id} operation to be #{target_status}."
             end
 
             self.reload
 
             yield(self) if block_given?
 
-            break if target_state == state.downcase.to_sym
+            break if target_status == status.downcase.to_sym
 
             sleep(1)
           end

@@ -119,7 +119,7 @@ module Bosh::Google
 
             @logger.info("Create new image..")
             raw_disk_url = "https://storage.googleapis.com/#{stemcell_directory_name}/#{image_name}"
-            image = compute.images.new(name: image_name, raw_disk: raw_disk_url)
+            image = compute.images.new(name: stemcell_image_name(image_path), raw_disk: raw_disk_url)
 
             remote { image.save }
 
