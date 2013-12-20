@@ -13,6 +13,7 @@ gemspec path: 'bosh_cli'
 gemspec path: 'bosh_cli_plugin_aws'
 gemspec path: 'bosh_cli_plugin_micro'
 gemspec path: 'bosh_openstack_cpi'
+gemspec path: 'bosh_google_cpi'
 gemspec path: 'bosh-registry'
 gemspec path: 'bosh_vsphere_cpi'
 gemspec path: 'bosh-director'
@@ -57,6 +58,7 @@ group :development, :test do
   gem 'fakefs'
   gem 'simplecov'
   gem 'simplecov-rcov'
+  gem 'vcr'
 
   # for director
   gem 'machinist', '~>1.0'

@@ -5,4 +5,19 @@ end
 
 require "bosh/registry/client"
 
-Dir['cloud/gce/*.rb'].each { |d| require d }
+require "common/exec"
+require "common/thread_pool"
+require "common/thread_formatter"
+
+require "fog"
+require "google/api_client"
+
+require "cloud"
+require "cloud/google/common_helpers"
+require "cloud/google/helpers"
+require "cloud/google/constants"
+
+require "cloud/google/cloud"
+
+
+Dir['cloud/google/**/*.rb'].each { |d| require d }

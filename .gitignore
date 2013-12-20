@@ -67,5 +67,5 @@ spec/assets/test_release/dev_releases
 spec_coverage
 spec_reports
 
-/tmp/*
+tmp
 coverage/
