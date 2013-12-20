@@ -50,7 +50,9 @@ module Fog
           options = { 'description'     => description }
 
           response = service.insert_image(name, raw_disk, options)
+          
           operation = service.operations.new(response.body)
+          operation.wait
 
           puts "Fog::Image#save -> operation: " + operation.inspect
 
@@ -70,6 +72,15 @@ module Fog
         def resource_url
           # "compute/v1/projects/#{project}/global/images/#{image}"
           "#{self.project}/global/images/#{name}"
+        end
+
+        def delete
+          requires :name
+
+          service.delete_image(name)
+          
+          operation = service.operations.new(response.body)
+          operation.wait          
         end
 
       end

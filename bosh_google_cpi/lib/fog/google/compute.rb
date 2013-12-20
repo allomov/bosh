@@ -835,6 +835,7 @@ module Fog
         end
 
         def build_result(api_method, parameters, body_object=nil)
+          # Fog::Logger.warning body_object.inspect
           if body_object
             result = @client.execute(
               :api_method => api_method,

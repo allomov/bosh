@@ -143,7 +143,7 @@ module Bosh::Google
       # TODO: do I need to remove blob here ?
       remote do 
         stemcell_image = compute.images.find { |image| image.id == stemcell_id } 
-        stemcell_image.destroy
+        stemcell_image.delete
       end
     end
 

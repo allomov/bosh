@@ -27,11 +27,12 @@ module Fog
         end
 
         def reload
-          requires :id
+          requires :name
 
-          data = collection.get(id, zone)
+          data = collection.get(name, zone_name)
 
           new_attributes = data.attributes
+
           self.merge_attributes(new_attributes)
           self
         end
