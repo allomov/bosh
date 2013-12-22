@@ -108,9 +108,9 @@ module Fog
           self.merge_attributes(data)
         end
 
-        def machine_type_url
-          "http://www.googleapis.com/compute/v1/projects/#{project}/global/machineTypes/#{machine_type}"
-        end
+        # def machine_type_url
+        #   "http://www.googleapis.com/compute/v1/projects/#{service.project}/global/machineTypes/#{machine_type}"
+        # end
 
         def save
           requires :name
@@ -128,7 +128,7 @@ module Fog
 
           options = {
               'image' => image_name,
-              'machineType' => machine_type_url,
+              'machineType' => machine_type,
               'networkInterfaces' => network_interfaces,
               'network' => network,
               'externalIp' => external_ip,
@@ -155,6 +155,9 @@ module Fog
         end
 
         def reset 
+          requires :name
+          requires :zone_name
+
           response = service.reset_server(name, zone_name)
 
           # handle errors in response.error ???

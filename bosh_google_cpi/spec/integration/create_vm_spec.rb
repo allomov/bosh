@@ -15,6 +15,7 @@ describe Bosh::Google::Cloud do
   before do
     delegate = double("delegate", task_checkpoint: nil, logger: Logger.new(STDOUT))
     Bosh::Clouds::Config.configure(delegate)
+    Fog.should_receive(:credentials).and_return({})
   end
 
 
@@ -47,12 +48,15 @@ describe Bosh::Google::Cloud do
   # download stemcell and place it in ./tmp/stemcells folder 
   let(:stemcell_path) { ENV['BOSH_GOOGLE_STEMCELL_PATH'] || './tmp/stemcell.tar.gz' }
 
-  describe "Image upload based flow" do
+  describe "VM" do
 
-    it "uploads image" do
-      stemcell_id = cpi.create_stemcell(stemcell_path)
+    it "lifecircle" do
+      # stemcell_id = cpi.create_stemcell(stemcell_path)
 
-      vm_id = cpi.create_vm(agent_id, stemcell_id, {'machine_type' => 'g1-small'}, networks)
+      image = cpi.compute.images.find { |image| image.name == 'debian-7-wheezy-v20131120' }
+      stemcell_id = image.id
+
+      vm_id = cpi.create_vm('agent_id', stemcell_id, {'machine_type' => 'g1-small', 'zone_name' => 'us-central1-a'}, [])
       # check if VM exists 
       cpi.has_vm?(vm_id).should be_true
 

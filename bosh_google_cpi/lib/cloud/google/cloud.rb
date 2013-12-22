@@ -92,10 +92,12 @@ module Bosh::Google
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
             @logger.info("Creating new image...")
-            stemcell_directory = generate_stemcell_directory_name
+            # stemcell_directory = generate_stemcell_directory_name
+            stemcell_directory = @storage.directories.find { |d| d.key == 'bosh-stemcell-1' }
+            # stemcell_directory = 'bosh-stemcell-1'
             # image_name     = stemcell_image_name(image_path)
 
-            image_name = "googlestemcelltard7cd1e7"
+            image_name = "disk.raw.tar"
 
                         
             # If image_path is set to existing file, then 
@@ -119,7 +121,7 @@ module Bosh::Google
             end
 
             @logger.info("Create new image..")
-            raw_disk_url = "https://storage.googleapis.com/#{stemcell_directory_name}/#{image_name}"
+            raw_disk_url = "https://storage.googleapis.com/#{stemcell_directory.key}/#{image_name}"
             image = compute.images.new(name: generate_stemcell_name(from: image_path), raw_disk: raw_disk_url)
 
             remote { image.save }
@@ -191,9 +193,19 @@ module Bosh::Google
         remote do
           server_name  = "vm-#{generate_timestamp}"
           image        = remote { @compute.images.find  { |f| f.id == stemcell_id } }
-          machine_type = resource_pool["machine_type"] || resource_pool["instance_type"]
+          machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
+          zone_name    =  resource_pool["zone_name"] || 'us-central1-a'
+          disks    = [ @compute.disks.find { |d| d.name == 'debian-5' } ]
+          networks = [ @compute.disks.find { |d| d.name == 'debian-5' } ]
           # machine_type = remote { @compute.flavors.find { |f| f.name == flavor_name } }
-          server = @compute.servers.new(name: server_name, machine_type: machine_type, image: image.name)
+          server = @compute.servers.new(name: server_name, 
+                                        machine_type: machine_type, 
+                                        image: image.name, 
+                                        zone_name: zone_name, 
+                                        disks: [], 
+                                        networks: [])
+          @compute.disks
+          server
           remote { server.save }
         end
       end
