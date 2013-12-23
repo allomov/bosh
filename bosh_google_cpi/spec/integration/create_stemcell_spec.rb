@@ -52,7 +52,7 @@ describe Bosh::Google::Cloud do
     it "uploads image" do
       stemcell_id = cpi.create_stemcell(stemcell_path)
       # check if stemcell exists in google compute engine
-      # cpi.delete_stemcell(stemcell_id)
+      cpi.delete_stemcell(stemcell_id)
       # check if stemcell doesn't exist in google compute engine
     end
 

@@ -142,6 +142,7 @@ module Fog
 
           # handle errors in response.error ???
           # maybe do it in another thread ???
+          # maybe do it asyncroniusly ?
           operation = service.operations.new(response.body)
           operation.wait
           

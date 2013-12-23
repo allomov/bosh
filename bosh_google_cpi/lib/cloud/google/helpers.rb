@@ -39,7 +39,7 @@ module Bosh::Google
       File.basename(image_path, '.*').tr('^A-Za-z0-9\-', '') + '-' + generate_timestamp
     end    
 
-    def generate_stemcell_directory_name
+    def stemcell_directory
       # check if folder exists and has access
       # TODO: what to do if DeniedAccess is thrown
       @logger.info("Connecting to stemcell directory (#{stemcell_directory_name})...")
