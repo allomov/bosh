@@ -51,10 +51,10 @@ describe Bosh::Google::Cloud do
   describe "VM" do
 
     it "lifecircle" do
-      # stemcell_id = cpi.create_stemcell(stemcell_path)
+      stemcell_id = cpi.create_stemcell(stemcell_path)
 
-      image = cpi.compute.images.find { |image| image.name == 'debian-7-wheezy-v20131120' }
-      stemcell_id = image.id
+      # image = cpi.compute.images.find { |image| image.name == 'debian-7-wheezy-v20131120' }
+      # stemcell_id = image.id
 
       vm_id = cpi.create_vm('agent_id', stemcell_id, {'machine_type' => 'g1-small', 'zone_name' => 'us-central1-a'}, [])
       # check if VM exists 

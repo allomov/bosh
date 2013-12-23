@@ -15,9 +15,7 @@ module Fog
         def insert_image(image_name, image_source, options={})
           api_method = @compute.images.insert
 
-          parameters = {
-            'project' => @project
-          }
+          parameters = {'project' => @project}
 
           body_object = {
             'name'            => image_name,
@@ -28,9 +26,7 @@ module Fog
           # Merge in the remaining params (only 'description' should remain)
           body_object.merge!(options)
 
-          result = self.build_result(api_method,
-                                     parameters,
-                                     body_object)
+          result = self.build_result(api_method, parameters, body_object)
           
           response = self.build_response(result)
         end

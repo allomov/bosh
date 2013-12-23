@@ -93,17 +93,15 @@ module Bosh::Google
         begin
             @logger.info("Creating new image...")
             # stemcell_directory = generate_stemcell_directory_name
-            # stemcell_directory = @storage.directories.find { |d| d.key == 'bosh-stemcell-1' }
-
-            stemcell_directory = @storage.directories.find { |d| d.key == 'myveryownbucket_huehuehuehue' }
+            stemcell_directory = @storage.directories.find { |d| d.key == 'bosh-stemcell-1' }
+            # stemcell_directory = @storage.directories.find { |d| d.key == 'myveryownbucket_huehuehuehue' }
             
             # stemcell_directory = 'bosh-stemcell-1'
             # image_name     = stemcell_image_name(image_path)
 
-            # image_name = "disk.raw.tar"
-            image_name = "clear_ubuntu.tar.gz"
+            image_name = "disk.raw"
+            # image_name = "clear_ubuntu.tar.gz"
 
-                        
             # If image_path is set to existing file, then 
             # from the remote location on a background job and store it in its repository.
             # Otherwise, unpack image to temp directory and upload to Glance the root image.

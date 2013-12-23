@@ -20,6 +20,11 @@ module Fog
         attribute :tags, :squash => 'items'
         attribute :self_link, :aliases => 'selfLink'
 
+        has_many :attached_disks
+        has_many :network_interfaces
+
+        
+
         def image_name=(args)
           Fog::Logger.deprecation("image_name= is no longer used [light_black](#{caller.first})[/]")
         end
@@ -188,6 +193,11 @@ module Fog
           # service.servers.merge_attributes(data)
           self.merge_attributes(data)
           self          
+        end
+        alias_method :reboot, :reset
+
+        def create(options)
+          collection.new(options).save
         end
 
       end
