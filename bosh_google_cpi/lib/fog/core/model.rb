@@ -7,7 +7,7 @@ module Fog
     extend Fog::Attributes::ClassMethods
     include Fog::Attributes::InstanceMethods
     include Fog::Core::DeprecatedConnectionAccessors
-    include Fog::Core::Associations
+    # include Fog::Core::Associations
 
     attr_accessor :collection
     attr_reader :service
@@ -19,7 +19,7 @@ module Fog
         Fog::Logger.deprecation("Passing :connection option is deprecated, use :service instead [light_black](#{caller.first})[/]")
         @service = new_attributes[:connection]
       end
-      update_nested_models(nested_models_attributes)
+      # update_nested_models(nested_models_attributes)
       merge_attributes(new_attributes)
     end
 

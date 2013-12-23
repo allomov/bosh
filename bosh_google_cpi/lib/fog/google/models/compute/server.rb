@@ -7,6 +7,8 @@ module Fog
 
       class Server < Fog::Compute::Server
 
+        include Fog::Core::Associations
+
         identity :name
 
         attribute :network_interfaces, :aliases => 'networkInterfaces'
@@ -23,7 +25,30 @@ module Fog
         has_many :attached_disks
         has_many :network_interfaces
 
-        
+        class AttachedDisk < Fog::NestedModel
+          attribute :index
+          attribute :type
+          attribute :mode
+          attribute :device_name, aliases: 'deviceName'
+          attribute :boot
+          
+          # source is URL that I can use to fetch instance, but how wrap it with model ??
+          def instance 
+
+          end
+        end
+
+        class NetworkInterface < Fog::Model
+          
+        end
+
+        def default_network
+          self.service.networks.find { |network| network.name == 'default' }
+        end
+
+        def default_disk
+          # self.attached_disks.
+        end
 
         def image_name=(args)
           Fog::Logger.deprecation("image_name= is no longer used [light_black](#{caller.first})[/]")
