@@ -189,7 +189,7 @@ module Bosh::Google
     # @return [String] opaque id later used by {#configure_networks}, {#attach_disk},
     #                  {#detach_disk}, and {#delete_vm}
     def create_vm(agent_id, stemcell_id, resource_pool,
-                  networks, disk_locality = nil, env = nil)
+                  networks = nil, disk_locality = nil, env = nil)
       with_thread_name("create_vm(#{agent_id}, ...)") do
         @logger.info("Creating new server...")
         remote do
@@ -200,11 +200,12 @@ module Bosh::Google
           zone_name    =  resource_pool["zone_name"] || 'us-central1-b'
           # machine_type = remote { @compute.flavors.find { |f| f.name == flavor_name } }
 
+          # networks = [default_network]
           server = @compute.servers.bootstrap( name: server_name, 
-                                               image_name: image.name, 
+                                               source_image: image.name, 
                                                zone_name: zone_name, 
-                                               machine_type: machine_type, 
-                                               networks: [default_network])
+                                               machine_type: machine_type)
+                                               # networks: [default_network])
           
           server.id.to_s
 

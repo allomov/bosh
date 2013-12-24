@@ -1,4 +1,5 @@
 require 'fog/compute/models/server'
+require 'fog/core/associations'
 require 'net/ssh/proxy/command'
 
 module Fog
@@ -167,7 +168,7 @@ module Fog
           requires :machine_type
           requires :zone_name
           requires :disks
-          requires :network_interfaces
+          # requires :network_interfaces
 
           if not service.zones.find{ |zone| zone.name == self.zone_name }
             raise ArgumentError.new "#{self.zone_name.inspect} is either down or you don't have permission to use it."
@@ -177,7 +178,7 @@ module Fog
 
           options = {
               'machineType' => machine_type,
-              'networkInterfaces' => network_interfaces,
+              # 'networkInterfaces' => network_interfaces,
               'network' => network,
               'externalIp' => external_ip,
               'disks' => disks,

@@ -21,7 +21,6 @@ describe Bosh::Google::Cloud do
   subject(:cpi) do
     described_class.new(
       # TODO: simplify it 
-      # client_email key_location project storage_access_key storage_secret
       'google' => {
         'compute' => {
           'client_email' => @config[:client_email],
@@ -42,7 +41,7 @@ describe Bosh::Google::Cloud do
         "password" => "fake"
       }
     )
-  end  
+  end
 
   # download stemcell and place it in ./tmp/stemcells folder 
   let(:stemcell_path) { ENV['BOSH_GOOGLE_STEMCELL_PATH'] || './tmp/stemcell.tar.gz' }

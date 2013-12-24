@@ -15,14 +15,12 @@ describe Bosh::Google::Cloud do
   before do
     delegate = double("delegate", task_checkpoint: nil, logger: Logger.new(STDOUT))
     Bosh::Clouds::Config.configure(delegate)
-    Fog.should_receive(:credentials).and_return({})
   end
 
 
   subject(:cpi) do
     described_class.new(
       # TODO: simplify it 
-      # client_email key_location project storage_access_key storage_secret
       'google' => {
         'compute' => {
           'client_email' => @config[:client_email],
@@ -43,7 +41,7 @@ describe Bosh::Google::Cloud do
         "password" => "fake"
       }
     )
-  end  
+  end
 
   # download stemcell and place it in ./tmp/stemcells folder 
   let(:stemcell_path) { ENV['BOSH_GOOGLE_STEMCELL_PATH'] || './tmp/stemcell.tar.gz' }
@@ -51,12 +49,12 @@ describe Bosh::Google::Cloud do
   describe "VM" do
 
     it "lifecircle" do
-      stemcell_id = cpi.create_stemcell(stemcell_path)
+      # stemcell_id = cpi.create_stemcell(stemcell_path)
 
-      # image = cpi.compute.images.find { |image| image.name == 'debian-7-wheezy-v20131120' }
-      # stemcell_id = image.id
+      image = cpi.compute.images.find { |image| image.name == 'debian-7-wheezy-v20131120' }
+      stemcell_id = image.id
 
-      vm_id = cpi.create_vm('agent_id', stemcell_id, {'machine_type' => 'g1-small', 'zone_name' => 'us-central1-a'}, [])
+      vm_id = cpi.create_vm('agent_id', stemcell_id, {'machine_type' => 'g1-small', 'zone_name' => 'us-central1-b'})
       # check if VM exists 
       cpi.has_vm?(vm_id).should be_true
 

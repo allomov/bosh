@@ -1,6 +1,6 @@
 module Fog
   module Core
-    module Assotiations
+    module Associations
 
       def included(base)
         base.extend(ClassMethods)

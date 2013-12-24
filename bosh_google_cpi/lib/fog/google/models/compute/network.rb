@@ -35,7 +35,9 @@ module Fog
         end
 
         def url
-          "https://www.googleapis.com/compute/v1/projects/#{@project}/global/networks/#{network}"
+          puts '@project!!!!' + service.project.inspect
+
+          "https://www.googleapis.com/compute/v1/projects/#{service.project}/global/networks/#{name}"
         end
       end
     end
