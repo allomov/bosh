@@ -22,10 +22,12 @@ module Fog
         attribute :tags, :squash => 'items'
         attribute :self_link, :aliases => 'selfLink'
 
-        has_many :attached_disks
-        has_many :network_interfaces
+        attribute :network_interfaces
 
-        class AttachedDisk < Fog::NestedModel
+        # has_many :attached_disks
+        # has_many :network_interfaces
+
+        class AttachedDisk < Fog::Model
           attribute :index
           attribute :type
           attribute :mode
@@ -39,16 +41,14 @@ module Fog
         end
 
         class NetworkInterface < Fog::Model
-          
+          attribute :access_configs, aliases: 'accessConfigs'
+          attribute :network # URL
         end
 
         def default_network
           self.service.networks.find { |network| network.name == 'default' }
         end
 
-        def default_disk
-          # self.attached_disks.
-        end
 
         def image_name=(args)
           Fog::Logger.deprecation("image_name= is no longer used [light_black](#{caller.first})[/]")
@@ -86,7 +86,7 @@ module Fog
           # wait until "RUNNING" or "DONE" to ensure the operation doesn't fail, raises exception on error
           Fog.wait_for do
             operation = service.get_zone_operation(zone_name, operation.body["name"])
-            operation.body["status"] != "PENDING"
+            operation.ready?
           end
           operation
         end
@@ -167,6 +167,7 @@ module Fog
           requires :machine_type
           requires :zone_name
           requires :disks
+          requires :network_interfaces
 
           if not service.zones.find{ |zone| zone.name == self.zone_name }
             raise ArgumentError.new "#{self.zone_name.inspect} is either down or you don't have permission to use it."

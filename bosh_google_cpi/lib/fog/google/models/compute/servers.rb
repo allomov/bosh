@@ -67,9 +67,12 @@ module Fog
             disks = [disk]
           end
 
+          default_network = service.networks.find { |d| d.name == 'default' }
+
           defaults = {
             :name => name,
             :disks => disks,
+            :network_interfaces => [ {network: default_network.url} ]
             :machine_type => "n1-standard-1",
             :zone_name => zone,
             :private_key_path => File.expand_path("~/.ssh/id_rsa"),

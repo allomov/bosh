@@ -8,6 +8,7 @@ module Fog
     include Fog::Attributes::InstanceMethods
     include Fog::Core::DeprecatedConnectionAccessors
     # include Fog::Core::Associations
+    
 
     attr_accessor :collection
     attr_reader :service

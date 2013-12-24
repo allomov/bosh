@@ -193,22 +193,21 @@ module Bosh::Google
       with_thread_name("create_vm(#{agent_id}, ...)") do
         @logger.info("Creating new server...")
         remote do
+
           server_name  = "vm-#{generate_timestamp}"
           image        = remote { @compute.images.find  { |f| f.id == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
-          zone_name    =  resource_pool["zone_name"] || 'us-central1-a'
-          disks    = [ @compute.disks.find { |d| d.name == 'debian-5' } ]
-          networks = [ @compute.disks.find { |d| d.name == 'debian-5' } ]
+          zone_name    =  resource_pool["zone_name"] || 'us-central1-b'
           # machine_type = remote { @compute.flavors.find { |f| f.name == flavor_name } }
-          server = @compute.servers.new(name: server_name, 
-                                        machine_type: machine_type, 
-                                        image: image.name, 
-                                        zone_name: zone_name, 
-                                        disks: [], 
-                                        networks: [])
-          @compute.disks
-          server
-          remote { server.save }
+
+          server = @compute.servers.bootstrap( name: server_name, 
+                                               image_name: image.name, 
+                                               zone_name: zone_name, 
+                                               machine_type: machine_type, 
+                                               networks: [default_network])
+          
+          server.id.to_s
+
         end
       end
 
@@ -244,7 +243,7 @@ module Bosh::Google
     # @return [void]
     def reboot_vm(vm_id)
       remote do
-        find_server_by_id(vm_id).reset
+        find_server_by_id(vm_id).reboot
       end
     end
 
