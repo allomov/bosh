@@ -17,14 +17,17 @@ Gem::Specification.new do |s|
   s.files        = `git ls-files -- bin/* lib/* scripts/*`.split("\n") + %w(README.md)
   s.require_path = 'lib'
   s.bindir       = 'bin'
-  s.executables  = %w(bosh_aws_console)
+  s.executables  = %w()
 
-  s.add_dependency 'google-api-client', '1.8.5'
-  # s.add_dependency 'fog', '1.14.0'
+  s.add_dependency 'google-api-client', '~>0.6.4'
+  s.add_dependency 'fog', '1.14.0'
 
   s.add_dependency 'bosh_common', "~>#{version}"
   s.add_dependency 'bosh_cpi', "~>#{version}"
   s.add_dependency 'bosh-registry', "~>#{version}"
   s.add_dependency 'httpclient', '=2.2.4'
   s.add_dependency 'yajl-ruby', '>=0.8.2'
+
+  # remove after updating fog version upper to 1.18
+  s.add_dependency 'mime-types', '>=0.8.2'
 end

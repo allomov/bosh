@@ -14,6 +14,7 @@ module Bosh::OpenStackCloud
     attr_reader :registry
     attr_reader :glance
     attr_accessor :logger
+    # attr_accessor :logger
 
     ##
     # Creates a new BOSH OpenStack CPI
@@ -854,6 +855,8 @@ module Bosh::OpenStackCloud
       end
     end
 
+    def hash_has_keys()
+
     def initialize_registry
       registry_properties = @options.fetch('registry')
       registry_endpoint   = registry_properties.fetch('endpoint')
@@ -867,3 +870,4 @@ module Bosh::OpenStackCloud
 
   end
 end
+ 
