@@ -10,6 +10,7 @@ module Fog
         include Shared
 
         def reset_server(server_name, zone_name)
+          Fog::Mock.not_implemented
         end
 
       end

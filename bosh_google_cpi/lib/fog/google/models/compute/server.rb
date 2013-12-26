@@ -16,7 +16,8 @@ module Fog
         attribute :network, :aliases => 'network'
         attribute :external_ip, :aliases => 'externalIP'
         attribute :state, :aliases => 'status'
-        attribute :zone_name, :aliases => 'zone'
+        # URL is returned by get !!! https://developers.google.com/compute/docs/reference/latest/instances/get
+        attribute :zone_name, :aliases => 'zone', :setter => method(:convert_from_url_to_name)
         attribute :machine_type, :aliases => 'machineType'
         attribute :disks, :aliases => 'disks'
         attribute :metadata
@@ -24,6 +25,10 @@ module Fog
         attribute :self_link, :aliases => 'selfLink'
 
         attribute :network_interfaces
+
+        def convert_from_url_to_name(value)
+          value.match
+        end
 
         # has_many :attached_disks
         # has_many :network_interfaces
@@ -204,8 +209,7 @@ module Fog
         end
 
         def reset 
-          requires :name
-          requires :zone_name
+          requires :name, :zone_name
 
           response = service.reset_server(name, zone_name)
 
@@ -225,6 +229,14 @@ module Fog
 
         def create(options)
           collection.new(options).save
+        end
+
+        def delete 
+          requires :name, :zone_name
+
+          response = service.delete_server(name, zone_name)
+
+          operation = service.operations.new(response.body)
         end
 
       end

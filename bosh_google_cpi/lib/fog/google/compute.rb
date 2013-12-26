@@ -49,6 +49,8 @@ module Fog
 
       request :set_metadata
 
+      request :reset_server
+
       model_path 'fog/google/models/compute'
       model :server
       collection :servers
