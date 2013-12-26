@@ -7,6 +7,7 @@ import (
 	fakesys "bosh/system/fakes"
 	"encoding/json"
 	"github.com/stretchr/testify/assert"
+	"path/filepath"
 	"testing"
 )
 
@@ -114,7 +115,61 @@ func TestRunSetsUpEphemeralDisk(t *testing.T) {
 	boot.Run()
 
 	assert.Equal(t, fakePlatform.SetupEphemeralDiskWithPathDevicePath, "/dev/sda")
-	assert.Equal(t, fakePlatform.SetupEphemeralDiskWithPathMountPoint, boshsettings.VCAP_BASE_DIR+"/data")
+}
+
+func TestRunMountsPersistentDisk(t *testing.T) {
+	settings := boshsettings.Settings{
+		Disks: boshsettings.Disks{
+			Persistent: map[string]string{"vol-123": "/dev/sdb"},
+		},
+	}
+
+	fakeInfrastructure, fakePlatform := getBootstrapDependencies()
+	fakeInfrastructure.Settings = settings
+
+	boot := New(fakeInfrastructure, fakePlatform)
+	_, err := boot.Run()
+
+	assert.NoError(t, err)
+	assert.Equal(t, fakePlatform.MountPersistentDiskDevicePath, "/dev/sdb")
+	assert.Equal(t, fakePlatform.MountPersistentDiskMountPoint, filepath.Join(boshsettings.VCAP_BASE_DIR, "store"))
+}
+
+func TestRunErrorsIfThereIsMoreThanOnePersistentDisk(t *testing.T) {
+	settings := boshsettings.Settings{
+		Disks: boshsettings.Disks{
+			Persistent: map[string]string{
+				"vol-123": "/dev/sdb",
+				"vol-456": "/dev/sdc",
+			},
+		},
+	}
+
+	fakeInfrastructure, fakePlatform := getBootstrapDependencies()
+	fakeInfrastructure.Settings = settings
+
+	boot := New(fakeInfrastructure, fakePlatform)
+	_, err := boot.Run()
+
+	assert.Error(t, err)
+}
+
+func TestRunDoesNotTryToMountWhenNoPersistentDisk(t *testing.T) {
+	settings := boshsettings.Settings{
+		Disks: boshsettings.Disks{
+			Persistent: map[string]string{},
+		},
+	}
+
+	fakeInfrastructure, fakePlatform := getBootstrapDependencies()
+	fakeInfrastructure.Settings = settings
+
+	boot := New(fakeInfrastructure, fakePlatform)
+	_, err := boot.Run()
+
+	assert.NoError(t, err)
+	assert.Equal(t, fakePlatform.MountPersistentDiskDevicePath, "")
+	assert.Equal(t, fakePlatform.MountPersistentDiskMountPoint, "")
 }
 
 func TestRunSetsRootAndVcapPasswords(t *testing.T) {
@@ -151,7 +206,15 @@ func TestRunSetsTime(t *testing.T) {
 	assert.Equal(t, 2, len(fakePlatform.SetTimeWithNtpServersServers))
 	assert.Equal(t, "0.north-america.pool.ntp.org", fakePlatform.SetTimeWithNtpServersServers[0])
 	assert.Equal(t, "1.north-america.pool.ntp.org", fakePlatform.SetTimeWithNtpServersServers[1])
-	assert.Equal(t, boshsettings.VCAP_BASE_DIR+"/bosh/etc/ntpserver", fakePlatform.SetTimeWithNtpServersServersFilePath)
+}
+
+func TestRunSetupsUpMonitUser(t *testing.T) {
+	fakeInfrastructure, fakePlatform := getBootstrapDependencies()
+	boot := New(fakeInfrastructure, fakePlatform)
+
+	boot.Run()
+
+	assert.True(t, fakePlatform.SetupMonitUserSetup)
 }
 
 func TestRunStartsMonit(t *testing.T) {
@@ -161,30 +224,6 @@ func TestRunStartsMonit(t *testing.T) {
 	boot.Run()
 
 	assert.True(t, fakePlatform.StartMonitStarted)
-}
-
-func TestRunSetsUpMonitUserIfFileDoesNotExist(t *testing.T) {
-	fakeInfrastructure, fakePlatform := getBootstrapDependencies()
-	boot := New(fakeInfrastructure, fakePlatform)
-
-	boot.Run()
-
-	monitUserFileStats := fakePlatform.Fs.GetFileTestStat("/var/vcap/monit/monit.user")
-	assert.NotNil(t, monitUserFileStats)
-	assert.Equal(t, "vcap:random-password", monitUserFileStats.Content)
-}
-
-func TestRunSkipsSetsUpMonitUserIfFileDoesExist(t *testing.T) {
-	fakeInfrastructure, fakePlatform := getBootstrapDependencies()
-	fakePlatform.Fs.WriteToFile("/var/vcap/monit/monit.user", "vcap:other-random-password")
-
-	boot := New(fakeInfrastructure, fakePlatform)
-
-	boot.Run()
-
-	monitUserFileStats := fakePlatform.Fs.GetFileTestStat("/var/vcap/monit/monit.user")
-	assert.NotNil(t, monitUserFileStats)
-	assert.Equal(t, "vcap:other-random-password", monitUserFileStats.Content)
 }
 
 func getBootstrapDependencies() (inf *fakeinf.FakeInfrastructure, platform *fakeplatform.FakePlatform) {

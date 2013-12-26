@@ -2,6 +2,7 @@ package fakes
 
 import (
 	bc "bosh/agent/applier/bundlecollection"
+	boshsys "bosh/system"
 	"errors"
 )
 
@@ -9,34 +10,43 @@ type FakeBundleCollection struct {
 	installedBundles []bc.Bundle
 	enabledBundles   []bc.Bundle
 
+	InstallFs    boshsys.FileSystem
 	InstallPath  string
 	InstallError error
+
+	GetDirPath  string
+	GetDirFs    boshsys.FileSystem
+	GetDirError error
 
 	EnableError error
 }
 
 func NewFakeBundleCollection() *FakeBundleCollection {
-	return &FakeBundleCollection{
-		installedBundles: make([]bc.Bundle, 0),
-		enabledBundles:   make([]bc.Bundle, 0),
-	}
+	return &FakeBundleCollection{}
 }
 
-func (s *FakeBundleCollection) Install(bundle bc.Bundle) (string, error) {
+func (s *FakeBundleCollection) Install(bundle bc.Bundle) (boshsys.FileSystem, string, error) {
 	err := s.checkBundle(bundle)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
 
 	if s.InstallError != nil {
-		return "", s.InstallError
+		return nil, "", s.InstallError
 	}
 	s.installedBundles = append(s.installedBundles, bundle)
-	return s.InstallPath, nil
+	return s.InstallFs, s.InstallPath, nil
 }
 
 func (s *FakeBundleCollection) IsInstalled(bundle bc.Bundle) bool {
 	return s.checkExists(s.installedBundles, bundle)
+}
+
+func (s *FakeBundleCollection) GetDir(bundle bc.Bundle) (fs boshsys.FileSystem, path string, err error) {
+	fs = s.GetDirFs
+	path = s.GetDirPath
+	err = s.GetDirError
+	return
 }
 
 func (s *FakeBundleCollection) Enable(bundle bc.Bundle) error {

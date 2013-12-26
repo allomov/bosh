@@ -1,6 +1,8 @@
 package settings
 
-import "path/filepath"
+import (
+	bosherr "bosh/errors"
+)
 
 type SettingsFetcher func() (settings Settings, err error)
 
@@ -14,6 +16,17 @@ func NewService(initialSettings Settings, settingsFetcher SettingsFetcher) (serv
 		settings:        initialSettings,
 		settingsFetcher: settingsFetcher,
 	}
+}
+
+func (service *concreteService) Refresh() (err error) {
+	newSettings, err := service.settingsFetcher()
+	if err != nil {
+		err = bosherr.WrapError(err, "Invoking settings fetcher")
+		return
+	}
+
+	service.settings = newSettings
+	return
 }
 
 func (service *concreteService) GetBlobstore() Blobstore {
@@ -34,14 +47,6 @@ func (service *concreteService) GetMbusUrl() string {
 
 func (service *concreteService) GetDisks() Disks {
 	return service.settings.Disks
-}
-
-func (service *concreteService) GetStoreMountPoint() string {
-	return filepath.Join(VCAP_BASE_DIR, "store")
-}
-
-func (service *concreteService) GetStoreMigrationMountPoint() string {
-	return filepath.Join(VCAP_BASE_DIR, "store_migration_target")
 }
 
 func (service *concreteService) GetDefaultIp() (ip string, found bool) {

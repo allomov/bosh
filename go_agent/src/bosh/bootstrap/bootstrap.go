@@ -7,6 +7,7 @@ import (
 	boshsettings "bosh/settings"
 	boshsys "bosh/system"
 	"encoding/json"
+	"errors"
 	"path/filepath"
 )
 
@@ -61,25 +62,35 @@ func (boot bootstrap) Run() (settingsService boshsettings.Service, err error) {
 		return
 	}
 
-	err = boot.platform.SetTimeWithNtpServers(settings.Ntp, filepath.Join(boshsettings.VCAP_BASE_DIR, "/bosh/etc/ntpserver"))
+	err = boot.platform.SetTimeWithNtpServers(settings.Ntp)
 	if err != nil {
 		err = bosherr.WrapError(err, "Setting up NTP servers")
 		return
 	}
 
-	err = boot.platform.SetupEphemeralDiskWithPath(settings.Disks.Ephemeral, filepath.Join(boshsettings.VCAP_BASE_DIR, "data"))
+	err = boot.platform.SetupEphemeralDiskWithPath(settings.Disks.Ephemeral)
 	if err != nil {
 		err = bosherr.WrapError(err, "Setting up ephemeral disk")
 		return
 	}
 
-	monitUserFilePath := filepath.Join(boshsettings.VCAP_BASE_DIR, "monit", "monit.user")
-	if !boot.fs.FileExists(monitUserFilePath) {
-		_, err = boot.fs.WriteToFile(monitUserFilePath, "vcap:random-password")
+	if len(settings.Disks.Persistent) > 1 {
+		err = errors.New("Error mounting persistent disk, there is more than one persistent disk")
+		return
+	}
+
+	for _, devicePath := range settings.Disks.Persistent {
+		err = boot.platform.MountPersistentDisk(devicePath, filepath.Join(boshsettings.VCAP_BASE_DIR, "store"))
 		if err != nil {
-			err = bosherr.WrapError(err, "Writing monit user file")
+			err = bosherr.WrapError(err, "Mounting persistent disk")
 			return
 		}
+	}
+
+	err = boot.platform.SetupMonitUser()
+	if err != nil {
+		err = bosherr.WrapError(err, "Setting up monit user")
+		return
 	}
 
 	err = boot.platform.StartMonit()
