@@ -286,7 +286,7 @@ module Bosh::Google
     # @return [String] opaque id later used by {#attach_disk}, {#detach_disk}, and {#delete_disk}
     def create_disk(size, vm_locality = nil)
       remote do
-        disk = compute.disks.new(name: "bosh-disk-#{generate_timestamp}", zone_name: 'us-central1-b', size_gb: size * 1024)
+        disk = compute.disks.new(name: "bosh-disk-#{generate_timestamp}", zone_name: 'us-central1-b', size_gb: (size / 1024).to_i)
         disk.save
         disk.identity.to_s
       end

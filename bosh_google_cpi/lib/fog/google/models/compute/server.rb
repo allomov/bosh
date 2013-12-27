@@ -211,7 +211,7 @@ module Fog
         def attached_disks
           requires :disks
           @attached_disks ||= self.disks.map do |disk|
-            # we can work without parsing but not now
+            # we can work without parsing, but not now
             _, zone, name = disk['source'].match(/https\:\/\/www\.googleapis\.com\/compute\/v1\/projects\/project\/zones\/(.+)\/disks\/(.+)/).to_a
             response = service.get_disk(name, zone)
             service.disks.new(response.body)
