@@ -131,7 +131,7 @@ module Bosh::Google
             # is it needed ??? 
             wait_resource(image, :ready)
             
-            image.id.to_s
+            image.identity.to_s
         rescue => e
           @logger.error(e)
           raise e
@@ -147,8 +147,9 @@ module Bosh::Google
     def delete_stemcell(stemcell_id)
       # TODO: do I need to remove blob here ?
       remote do 
-        stemcell_image = compute.images.find { |image| image.id == stemcell_id } 
-        stemcell_image.delete
+        stemcell_image = find_by_identity(compute.images, stemcell_id)
+        operation = stemcell_image.delete
+        operation.wait
       end
     end
 
@@ -198,17 +199,14 @@ module Bosh::Google
           image        = remote { @compute.images.find  { |f| f.id == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
           zone_name    =  resource_pool["zone_name"] || 'us-central1-b'
-          # machine_type = remote { @compute.flavors.find { |f| f.name == flavor_name } }
-
-          # networks = [default_network]
           server = @compute.servers.bootstrap( name: server_name, 
                                                source_image: image.name, 
                                                zone_name: zone_name, 
                                                machine_type: machine_type)
-                                               # networks: [default_network])
           
-          server.id.to_s
-
+          # is id a name or an id ????
+          # server.id.to_s
+          server.identity.to_s
         end
       end
 
@@ -221,7 +219,8 @@ module Bosh::Google
     # @return [void]
     def delete_vm(vm_id)
       remote do
-        find_server_by_id(vm_id).delete
+        operation = find_server_by_identity(vm_id).delete
+        operation.wait
       end
     end
 
@@ -232,7 +231,7 @@ module Bosh::Google
     # @return [Boolean] True if the vm exists
     def has_vm?(vm_id)
       remote do
-        !!find_server_by_id(vm_id)
+        !!find_server_by_identity(vm_id)
       end
     end
 
@@ -244,7 +243,8 @@ module Bosh::Google
     # @return [void]
     def reboot_vm(vm_id)
       remote do
-        find_server_by_id(vm_id).reboot
+        operation = find_server_by_identity(vm_id).reboot
+        operation.wait
       end
     end
 
@@ -258,7 +258,9 @@ module Bosh::Google
     # @return [void]
     def set_vm_metadata(vm, metadata)
       remote do
-        server = find_server_by_id(vm_id)
+        server = find_server_by_identity(vm_id)
+        operation = server.set_metadata(metadata)
+        operation.wait
       end
     end
 
@@ -284,7 +286,9 @@ module Bosh::Google
     # @return [String] opaque id later used by {#attach_disk}, {#detach_disk}, and {#delete_disk}
     def create_disk(size, vm_locality = nil)
       remote do
-        
+        disk = compute.disks.new(name: "bosh-disk-#{generate_timestamp}", zone_name: 'us-central1-b', size_gb: size * 1024)
+        disk.save
+        disk.identity.to_s
       end
     end
 
@@ -296,7 +300,9 @@ module Bosh::Google
     # @return [void]
     def delete_disk(disk_id)
       remote do
-        
+        disk = find_by_identity(compute.disks, disk_id)
+        operation = disk.delete
+        operation.wait
       end
     end
 
@@ -308,9 +314,25 @@ module Bosh::Google
     # @return [void]
     def attach_disk(vm_id, disk_id)
       remote do
-        
+        server = find_server_by_identity(vm_id)
+        disk   = find_by_identity(compute.disks, disk_id)
+        operation = server.attach(disk)
+        operation.wait
       end
     end
+
+    ##
+    # Detaches a disk
+    #
+    # @param [String] vm vm id that was once returned by {#create_vm}
+    # @param [String] disk disk id that was once returned by {#create_disk}
+    # @return [void]
+    def detach_disk(vm_id, disk_id)
+      server = find_server_by_identity(vm_id)
+      disk = find_by_identity(compute.disks, disk_id)
+      operation = server.detach(disk)
+      operation.wait
+    end    
 
     # Take snapshot of disk
     # @param [String] disk_id disk id of the disk to take the snapshot of
@@ -326,16 +348,6 @@ module Bosh::Google
     end
 
     ##
-    # Detaches a disk
-    #
-    # @param [String] vm vm id that was once returned by {#create_vm}
-    # @param [String] disk disk id that was once returned by {#create_disk}
-    # @return [void]
-    def detach_disk(vm_id, disk_id)
-      not_implemented(:detach_disk)
-    end
-
-    ##
     # List the attached disks of the VM.
     #
     # @param [String] vm_id is the CPI-standard vm_id (eg, returned from current_vm_id)
@@ -343,14 +355,13 @@ module Bosh::Google
     # @return [array[String]] list of opaque disk_ids that can be used with the
     # other disk-related methods on the CPI
     def get_disks(vm_id)
-      not_implemented(:get_disks)
-    end
-
-    ##
-    # Validates the deployment
-    # @api not_yet_used
-    def validate_deployment(old_manifest, new_manifest)
-      not_implemented(:validate_deployment)
+      remote do
+        server = find_server_by_identity(vm_id)
+        # currently server.disks return hash with #attachedDisks object
+        # https://www.googleapis.com/compute/v1/projects/project/zones/#{zone}/disks/#{disk}
+        # server.disks.map { |disk| get_disk disk['source'] }
+        server.attached_disks.map { |disk| disk.identity.to_s }
+      end      
     end
 
   end

@@ -132,6 +132,7 @@ module Fog
         def reload
           data = service.get_server(self.name, self.zone).body
           self.merge_attributes(data)
+          @attached_disks = nil # it is made to reload #attached_disks next time it will be called 
         end
 
         def save
@@ -174,30 +175,49 @@ module Fog
         end
 
         def reset 
-          requires :name
-          requires :zone_name
-
-          response = service.reset_server(name, zone_name)
-
-          # handle errors in response.error ???
-          # maybe do it in another thread ???
-          operation = service.operations.new(response.body)
-          operation.wait
-
-          # check if server is available
-          data = service.backoff_if_unfound { service.get_server(self.name, self.zone_name).body }
-
-          # service.servers.merge_attributes(data)
-          self.merge_attributes(data)
-          self          
-        end
-
-        def reset 
           requires :name, :zone_name
           response = service.reset_server(name, zone_name)
-          response
+          service.operations.new(response.body)
         end
         alias_method :reboot, :reset
+
+
+        def set_metadata(metadata = {})
+          requires :name, :zone_name
+          response = service.set_metadata(name, zone_name, metadata)
+          service.operations.new(response.body)
+        end
+
+        def attach(disk, options = {})
+          requires :name, :zone_name
+          if disk.is_a?(Disk)
+            service.attach_disk(self.name, disk.self_link, zone_name, options)
+          else
+            raise 'Currently Server#attach method accepts only Disk object.'
+          end
+        end
+
+        def detach(disk, options = {})
+          requires :name, :zone_name
+          if disk.is_a?(Disk)
+            attached_disk = self.disks.select { |disk| disk.source == disk.self_link }
+            device_name = attached_disk['deviceName']
+            service.detach_disk(self.name, device_name, zone_name, options)
+          else
+            raise 'Currently Server#detach method accepts only Disk object.'
+          end
+        end
+
+        def attached_disks
+          requires :disks
+          @attached_disks ||= self.disks.map do |disk|
+            # we can work without parsing but not now
+            _, zone, name = disk['source'].match(/https\:\/\/www\.googleapis\.com\/compute\/v1\/projects\/project\/zones\/(.+)\/disks\/(.+)/).to_a
+            response = service.get_disk(name, zone)
+            service.disks.new(response.body)
+          end
+        end
+
 
       end
     end

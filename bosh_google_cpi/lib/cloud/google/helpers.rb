@@ -133,8 +133,12 @@ module Bosh::Google
   #                                            registry_password)
   #   end    
 
-    def find_server_by_id(vm_id)
-      @compute.servers.find { |server| server.id == vm_id }
+    def find_by_identity(collection, identity)
+      collection.find { |server| server.identity == identity }
+    end
+
+    def find_server_by_identity(id)
+      find_by_identity(@compute.servers, id)
     end
 
   end

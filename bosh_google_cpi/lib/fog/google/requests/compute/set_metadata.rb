@@ -17,15 +17,16 @@ module Fog
           parameters = {
             'project' => @project,
             'instance' => instance,
-            'zone' => zone,
+            'zone' => zone
           }
+
           body_object = {
-            "items" => metadata.to_a.map {|pair| { :key => pair[0], :value => pair[1] } }
+            # "fingerprint": "bytes"
+            "items" => metadata.to_a.map { |pair| { :key => pair[0], :value => pair[1] } }
           }
-          result = self.build_result(
-            api_method,
-            parameters,
-            body_object=body_object)
+          
+          result = self.build_result(api_method, parameters, body_object)
+
           response = self.build_response(result)
         end
 
