@@ -19,6 +19,7 @@ describe Bosh::Google::Cloud do
 
 
   subject(:cpi) do
+    puts @config.inspect
     described_class.new(
       # TODO: simplify it 
       'google' => {
@@ -50,7 +51,6 @@ describe Bosh::Google::Cloud do
 
     it "kill them all" do
 
-      puts cpi.compute.servers.inspect
       cpi.compute.servers.map do |server|
         server.delete
       end.each { |operation| operation.wait }
