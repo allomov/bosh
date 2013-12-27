@@ -1,14 +1,13 @@
 require 'fog/compute/models/server'
-require 'fog/core/associations'
 require 'net/ssh/proxy/command'
+require 'fog/google/helpers/attribute_converter'
 
 module Fog
   module Compute
     class Google
 
       class Server < Fog::Compute::Server
-
-        include Fog::Core::Associations
+        include Fog::Compute::Google::AttributeConverter
 
         identity :name
 
@@ -16,45 +15,15 @@ module Fog
         attribute :network, :aliases => 'network'
         attribute :external_ip, :aliases => 'externalIP'
         attribute :state, :aliases => 'status'
-        # URL is returned by get !!! https://developers.google.com/compute/docs/reference/latest/instances/get
-        attribute :zone_name, :aliases => 'zone', :setter => method(:convert_from_url_to_name)
+        attribute :zone_name, :aliases => 'zone'
         attribute :machine_type, :aliases => 'machineType'
         attribute :disks, :aliases => 'disks'
         attribute :metadata
         attribute :tags, :squash => 'items'
         attribute :self_link, :aliases => 'selfLink'
 
-        attribute :network_interfaces
-
-        def convert_from_url_to_name(value)
-          value.match
-        end
-
-        # has_many :attached_disks
-        # has_many :network_interfaces
-
-        class AttachedDisk < Fog::Model
-          attribute :index
-          attribute :type
-          attribute :mode
-          attribute :device_name, aliases: 'deviceName'
-          attribute :boot
-          
-          # source is URL that I can use to fetch instance, but how wrap it with model ??
-          def instance 
-
-          end
-        end
-
-        class NetworkInterface < Fog::Model
-          attribute :access_configs, aliases: 'accessConfigs'
-          attribute :network # URL
-        end
-
-        def default_network
-          self.service.networks.find { |network| network.name == 'default' }
-        end
-
+        convert_attribute :zone_name
+        convert_attribute :machine_type
 
         def image_name=(args)
           Fog::Logger.deprecation("image_name= is no longer used [light_black](#{caller.first})[/]")
@@ -87,12 +56,12 @@ module Fog
         end
 
         def destroy
-          requires :name, :zone
+          requires :name, :zone_name
           operation = service.delete_server(name, zone)
           # wait until "RUNNING" or "DONE" to ensure the operation doesn't fail, raises exception on error
           Fog.wait_for do
             operation = service.get_zone_operation(zone_name, operation.body["name"])
-            operation.ready?
+            operation.body["status"] != "PENDING"
           end
           operation
         end
@@ -173,7 +142,6 @@ module Fog
           requires :machine_type
           requires :zone_name
           requires :disks
-          # requires :network_interfaces
 
           if not service.zones.find{ |zone| zone.name == self.zone_name }
             raise ArgumentError.new "#{self.zone_name.inspect} is either down or you don't have permission to use it."
@@ -183,7 +151,7 @@ module Fog
 
           options = {
               'machineType' => machine_type,
-              # 'networkInterfaces' => network_interfaces,
+              'networkInterfaces' => network_interfaces,
               'network' => network,
               'externalIp' => external_ip,
               'disks' => disks,
@@ -209,7 +177,8 @@ module Fog
         end
 
         def reset 
-          requires :name, :zone_name
+          requires :name
+          requires :zone_name
 
           response = service.reset_server(name, zone_name)
 
@@ -225,19 +194,13 @@ module Fog
           self.merge_attributes(data)
           self          
         end
-        alias_method :reboot, :reset
 
-        def create(options)
-          collection.new(options).save
-        end
-
-        def delete 
+        def reset 
           requires :name, :zone_name
-
-          response = service.delete_server(name, zone_name)
-
-          operation = service.operations.new(response.body)
+          response = service.reset_server(name, zone_name)
+          response
         end
+        alias_method :reboot, :reset
 
       end
     end

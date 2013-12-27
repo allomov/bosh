@@ -40,7 +40,7 @@ module Fog
           else
             new(response.body)
           end
-        rescue Excon::Errors::NotFound
+        rescue Fog::Errors::NotFound
           nil
         end
 
@@ -67,12 +67,9 @@ module Fog
             disks = [disk]
           end
 
-          networks = new_attributes[:networks] || [service.networks.find { |d| d.name == 'default' }]
-
           defaults = {
             :name => name,
             :disks => disks,
-            # :network_interfaces => networks.map { |network| Hash.new(network: network.url) },
             :machine_type => "n1-standard-1",
             :zone_name => zone,
             :private_key_path => File.expand_path("~/.ssh/id_rsa"),
