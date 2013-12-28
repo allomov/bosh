@@ -57,7 +57,7 @@ module Fog
 
         def destroy
           requires :name, :zone_name
-          response = service.delete_server(name, zone)
+          response = service.delete_server(name, zone_name)
           operation = service.operations.new(response.body)
           operation
         end
@@ -95,17 +95,8 @@ module Fog
         end
 
         def ready?
+          requires :state
           self.state == RUNNING
-        end
-
-        def zone
-          if self.zone_name.is_a? String
-            service.get_zone(self.zone_name.split('/')[-1]).body["name"]
-          elsif zone_name.is_a? Excon::Response
-            service.get_zone(zone_name.body["name"]).body["name"]
-          else
-            self.zone_name
-          end
         end
 
         def add_ssh_key username, key
@@ -130,9 +121,12 @@ module Fog
 
 
         def reload
-          data = service.get_server(self.name, self.zone).body
-          self.merge_attributes(data)
+          puts 'reload > ' + self.name + ' ' +  self.zone_name
+          data = service.get_server(self.name, self.zone_name).body
+          puts 'result > ' + data.inspect
           @attached_disks = nil # it is made to reload #attached_disks next time it will be called 
+          self.merge_attributes(data)
+          self
         end
 
         def save
@@ -184,14 +178,17 @@ module Fog
 
         def set_metadata(metadata = {})
           requires :name, :zone_name
-          response = service.set_metadata(name, zone_name, metadata)
+          puts self.metadata.inspect
+
+          response = service.set_metadata(name, zone_name, self.metadata['fingerprint'], metadata)
           service.operations.new(response.body)
         end
 
         def attach(disk, options = {})
           requires :name, :zone_name
           if disk.is_a?(Disk)
-            service.attach_disk(self.name, disk.self_link, zone_name, options)
+            response = service.attach_disk(self.name, disk.self_link, zone_name, options)
+            service.operations.new(response.body)
           else
             raise 'Currently Server#attach method accepts only Disk object.'
           end
@@ -200,9 +197,13 @@ module Fog
         def detach(disk, options = {})
           requires :name, :zone_name
           if disk.is_a?(Disk)
-            attached_disk = self.disks.select { |disk| disk.source == disk.self_link }
-            device_name = attached_disk['deviceName']
-            service.detach_disk(self.name, device_name, zone_name, options)
+            puts self.disks.inspect
+            puts disk.inspect
+            puts disk.self_link
+            disk_device_to_detach = self.disks.find { |attached_disk| attached_disk['source'] == disk.self_link }
+            device_name = disk_device_to_detach['deviceName']
+            response = service.detach_disk(self.name, device_name, zone_name, options)
+            service.operations.new(response.body)
           else
             raise 'Currently Server#detach method accepts only Disk object.'
           end

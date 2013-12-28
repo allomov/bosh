@@ -4,7 +4,7 @@ module Fog
 
       class Mock
 
-        def detach_disk(instance_name, zone_name, options = {})
+        def detach_disk(instance_name, device_name, zone_name, options = {})
           Fog::Mock.not_implemented
         end
 
@@ -12,28 +12,17 @@ module Fog
 
       class Real
 
-        def detach_disk(instance_name, zone_name, options = {})
-          if zone_name.start_with? 'http'
-            zone_name = zone_name.split('/')[-1]
-          end
+        def detach_disk(instance_name, device_name, zone_name, options = {})
 
-          api_method = @compute.instances.attach_disk
+          api_method = @compute.instances.detach_disk
           parameters = {
             'project' => @project,
             'instance' => instance_name,
-            'zone' => zone_name
+            'zone' => zone_name, 
+            'deviceName' => device_name
           }
 
-          request_body = {
-            'type' => 'PERSISTENT', # there are 2 possible values: 'PERSISTENT' and 'SCRATCH' (depricated)
-            # ! You can only attach a persistent disk in read-write mode to a single instance
-            'mode' => options[:mode] || 'READ_WRITE', # possible valuese: READ_WRITE and READ_ONLY
-            'source' => URL, # The fully-qualified URL to the Persistent Disk resource.
-            # 'deviceName' => options[:device_name],
-            'boot' => options[:boot] || false
-          }
-
-          result = self.build_result(api_method, parameters, request_body)
+          result = self.build_result(api_method, parameters)
           response = self.build_response(result)
         end
 

@@ -69,7 +69,7 @@ describe Bosh::Google::Cloud do
       cpi.attach_disk(vm_id, disk_id)
       cpi.detach_disk(vm_id, disk_id)
 
-      cpi.delete_disk
+      cpi.delete_disk(disk_id)
 
       cpi.delete_vm(vm_id)
 

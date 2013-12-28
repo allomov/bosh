@@ -196,7 +196,7 @@ module Bosh::Google
         remote do
 
           server_name  = "vm-#{generate_timestamp}"
-          image        = remote { @compute.images.find  { |f| f.id == stemcell_id } }
+          image        = remote { @compute.images.find  { |f| f.identity == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
           zone_name    =  resource_pool["zone_name"] || 'us-central1-b'
           server = @compute.servers.bootstrap( name: server_name, 
@@ -206,6 +206,7 @@ module Bosh::Google
           
           # is id a name or an id ????
           # server.id.to_s
+          @logger.info("Server is created with #{server.identity.to_s} id...")
           server.identity.to_s
         end
       end
@@ -219,8 +220,10 @@ module Bosh::Google
     # @return [void]
     def delete_vm(vm_id)
       remote do
+        @logger.info("Removing VM with #{vm_id} id...")
         operation = find_server_by_identity(vm_id).delete
         operation.wait
+        @logger.info("VM is removed...")
       end
     end
 
@@ -231,6 +234,7 @@ module Bosh::Google
     # @return [Boolean] True if the vm exists
     def has_vm?(vm_id)
       remote do
+        @logger.info("Checking if there is VM with #{vm_id} id...")
         !!find_server_by_identity(vm_id)
       end
     end
@@ -243,6 +247,7 @@ module Bosh::Google
     # @return [void]
     def reboot_vm(vm_id)
       remote do
+        @logger.info("Rebooting VM with #{vm_id} id...")        
         operation = find_server_by_identity(vm_id).reboot
         operation.wait
       end
@@ -256,8 +261,9 @@ module Bosh::Google
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @param [Hash] metadata metadata key/value pairs
     # @return [void]
-    def set_vm_metadata(vm, metadata)
+    def set_vm_metadata(vm_id, metadata)
       remote do
+        @logger.info("Set VM with #{vm_id} id metadata #{metadata.inspect}...")
         server = find_server_by_identity(vm_id)
         operation = server.set_metadata(metadata)
         operation.wait
@@ -286,6 +292,7 @@ module Bosh::Google
     # @return [String] opaque id later used by {#attach_disk}, {#detach_disk}, and {#delete_disk}
     def create_disk(size, vm_locality = nil)
       remote do
+        @logger.info("Creating disk...")
         disk = compute.disks.new(name: "bosh-disk-#{generate_timestamp}", zone_name: 'us-central1-b', size_gb: (size / 1024).to_i)
         disk.save
         disk.identity.to_s
@@ -300,6 +307,7 @@ module Bosh::Google
     # @return [void]
     def delete_disk(disk_id)
       remote do
+        @logger.info("Removing disk with #{disk_id} id...")
         disk = find_by_identity(compute.disks, disk_id)
         operation = disk.delete
         operation.wait
@@ -314,6 +322,7 @@ module Bosh::Google
     # @return [void]
     def attach_disk(vm_id, disk_id)
       remote do
+        @logger.info("Attaching disk with #{disk_id} id to VM with #{vm_id} id...")
         server = find_server_by_identity(vm_id)
         disk   = find_by_identity(compute.disks, disk_id)
         operation = server.attach(disk)
@@ -328,10 +337,13 @@ module Bosh::Google
     # @param [String] disk disk id that was once returned by {#create_disk}
     # @return [void]
     def detach_disk(vm_id, disk_id)
-      server = find_server_by_identity(vm_id)
-      disk = find_by_identity(compute.disks, disk_id)
-      operation = server.detach(disk)
-      operation.wait
+      remote do 
+        @logger.info("Detaching disk with #{disk_id} id to VM with #{vm_id} id...")      
+        server = find_server_by_identity(vm_id)
+        disk = find_by_identity(compute.disks, disk_id)
+        operation = server.detach(disk)
+        operation.wait
+      end
     end    
 
     # Take snapshot of disk
@@ -355,6 +367,7 @@ module Bosh::Google
     # @return [array[String]] list of opaque disk_ids that can be used with the
     # other disk-related methods on the CPI
     def get_disks(vm_id)
+      @logger.info("Getting disks of VM with #{vm_id} id...")
       remote do
         server = find_server_by_identity(vm_id)
         # currently server.disks return hash with #attachedDisks object

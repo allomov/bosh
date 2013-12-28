@@ -4,7 +4,7 @@ module Fog
 
       class Mock
 
-        def attach_disk(instance_name, zone_name, options = {})
+        def attach_disk(instance_name, disk_url, zone_name, options = {})
           Fog::Mock.not_implemented
         end
 
@@ -13,9 +13,6 @@ module Fog
       class Real
 
         def attach_disk(instance_name, disk_url, zone_name, options = {})
-          if zone_name.start_with? 'http'
-            zone_name = zone_name.split('/')[-1]
-          end
 
           api_method = @compute.instances.attach_disk
           parameters = {
