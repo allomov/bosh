@@ -19,7 +19,7 @@ module Bosh::Google
     end
 
     def generate_timestamp
-      Time.now.strftime('-%Y%m%d-%6N')
+      Time.now.strftime('-%Y%m%d-%3N')
     end
 
     def client_email

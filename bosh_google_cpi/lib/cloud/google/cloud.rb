@@ -338,7 +338,7 @@ module Bosh::Google
     # @return [void]
     def detach_disk(vm_id, disk_id)
       remote do 
-        @logger.info("Detaching disk with #{disk_id} id to VM with #{vm_id} id...")      
+        @logger.info("Detaching disk with #{disk_id} id to VM with #{vm_id} id...")
         server = find_server_by_identity(vm_id)
         disk = find_by_identity(compute.disks, disk_id)
         operation = server.detach(disk)
@@ -350,13 +350,25 @@ module Bosh::Google
     # @param [String] disk_id disk id of the disk to take the snapshot of
     # @return [String] snapshot id
     def snapshot_disk(disk_id, metadata={})
-      not_implemented(:snapshot_disk)
+      remote do
+        @logger.info("Creating Snapshot for disk #{disk_id}")
+        disk = find_by_identity(compute.disks, disk_id)
+        snapshot_name = "bosh-snapshot-for-#{disk_id}-disk"
+        snapshot_name = "#{snapshot_name[0..40]}-#{generate_timestamp}"
+        snapshot = disk.create_snapshot(snapshot_name, "bosh snapshot for disk with #{disk_id} id. #{generate_timestamp}")
+        snapshot.identity.to_s
+      end
     end
 
     # Delete a disk snapshot
     # @param [String] snapshot_id snapshot id to delete
     def delete_snapshot(snapshot_id)
-      not_implemented(:delete_snapshot)
+      remote do
+        @logger.info("Removing Snapshot #{snapshot_id}")
+        snapshot = find_by_identity(compute.snapshots, snapshot_id)
+        operation = snapshot.delete
+        operation.wait
+      end
     end
 
     ##
