@@ -191,10 +191,10 @@ module Bosh::Google
     #                  {#detach_disk}, and {#delete_vm}
     def create_vm(agent_id, stemcell_id, resource_pool,
                   networks = nil, disk_locality = nil, env = nil)
+      # I guess networks attribute contains network information from config file?
       with_thread_name("create_vm(#{agent_id}, ...)") do
         @logger.info("Creating new server...")
         remote do
-
           server_name  = "vm-#{generate_timestamp}"
           image        = remote { @compute.images.find  { |f| f.identity == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
@@ -277,8 +277,14 @@ module Bosh::Google
     # @param [Hash] networks list of networks and their settings needed for this VM,
     #               same as the networks argument in {#create_vm}
     # @return [void]
+
     def configure_networks(vm_id, networks)
-      not_implemented(:configure_networks)
+      remote do
+        # server = find_server_by_identity(vm_id)
+        # operation = server.add_access_config(interface_name, nat_ip)
+        # operation.wait
+        @logger.info("configure_networks is not implemented yet...")
+      end
     end
 
     ##
@@ -364,10 +370,11 @@ module Bosh::Google
     # @param [String] snapshot_id snapshot id to delete
     def delete_snapshot(snapshot_id)
       remote do
-        @logger.info("Removing Snapshot #{snapshot_id}")
-        snapshot = find_by_identity(compute.snapshots, snapshot_id)
-        operation = snapshot.delete
-        operation.wait
+        # @logger.info("Removing Snapshot #{snapshot_id}")
+        # snapshot = find_by_identity(compute.snapshots, snapshot_id)
+        # operation = snapshot.delete
+        # operation.wait
+        @logger.info("delete_snapshot is not implemented yet...")
       end
     end
 
