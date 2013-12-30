@@ -1,7 +1,7 @@
 module Bosh::Agent
   class Infrastructure::Gce
-    require 'bosh_agent/infrastructure/openstack/settings'
-    require 'bosh_agent/infrastructure/openstack/registry'
+    require 'bosh_agent/infrastructure/gce/settings'
+    require 'bosh_agent/infrastructure/gce/registry'
 
     def load_settings
       Settings.new.load_settings
