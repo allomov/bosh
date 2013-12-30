@@ -191,10 +191,10 @@ PATH
 PATH
   remote: bosh_google_cpi
   specs:
-    bosh_google_cpi (1.5.0.pre.1504)
-      bosh-registry (~> 1.5.0.pre.1504)
-      bosh_common (~> 1.5.0.pre.1504)
-      bosh_cpi (~> 1.5.0.pre.1504)
+    bosh_google_cpi (1.5.0.pre.local)
+      bosh-registry (~> 1.5.0.pre.local)
+      bosh_common (~> 1.5.0.pre.local)
+      bosh_cpi (~> 1.5.0.pre.local)
       fog (= 1.14.0)
       google-api-client (~> 0.6.4)
       httpclient (= 2.2.4)
