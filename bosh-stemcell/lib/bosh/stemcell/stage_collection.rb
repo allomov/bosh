@@ -173,7 +173,6 @@ module Bosh::Stemcell
         # Finalisation,
         :bosh_clean,
         :bosh_harden,
-        :bosh_harden_ssh,
         # Image/bootloader
         :image_create,
         :image_install_grub,
