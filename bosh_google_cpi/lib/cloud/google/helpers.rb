@@ -18,6 +18,10 @@ module Bosh::Google
       SecureRandom.hex
     end
 
+    def generate_timestamp
+      Time.now.strftime('-%Y%m%d-%3N')
+    end
+
     def client_email
       self.options['google']['compute']['client_email']
     end
@@ -26,9 +30,14 @@ module Bosh::Google
       @stemcell_directory_name ||= "bosh-stemcells-#{generate_unique_name_from_email}"
     end
 
-    def stemcell_image_name(image_path)
-      File.basename(image_path, '.*').tr('^A-Za-z0-9', '') + generate_unique_name[0..6]
+    def generate_stemcell_name(options = {})
+      image = options[:from] || 'stemcell'
+      File.basename(image, '.*').tr('^A-Za-z0-9\-', '') + '-' + generate_timestamp
     end
+
+    def generate_vm_name
+      File.basename(image_path, '.*').tr('^A-Za-z0-9\-', '') + '-' + generate_timestamp
+    end    
 
     def stemcell_directory
       # check if folder exists and has access
@@ -123,6 +132,14 @@ module Bosh::Google
   #                                            registry_user,
   #                                            registry_password)
   #   end    
+
+    def find_by_identity(collection, identity)
+      collection.find { |server| server.identity == identity }
+    end
+
+    def find_server_by_identity(id)
+      find_by_identity(@compute.servers, id)
+    end
 
   end
 

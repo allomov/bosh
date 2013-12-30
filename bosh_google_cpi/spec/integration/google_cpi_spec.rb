@@ -155,7 +155,7 @@ describe Bosh::Google::Cloud do
         # spin up a new vm reusing the same IP it fails with a vm state error
         # but without any clue what the problem is (you should check the nova log).
         # This should be removed once we figure out how to deal with this situation.
-        sleep(120)
+        sleep(120) # ???
         vm_lifecycle(@stemcell_id, network_spec, [@existing_volume_id])
       end
     end

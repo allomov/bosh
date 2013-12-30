@@ -6,7 +6,6 @@ module Fog
 
       class Image < Fog::Model
 
-        # why not id ?
         identity :name
 
         attribute :id
@@ -15,7 +14,6 @@ module Fog
         attribute :creation_timestamp, :aliases => 'creationTimestamp'
         attribute :deprecated
         attribute :description
-        
 
         # This attribute is not available in the representation of an
         # 'image' returned by the GCE servser (see GCE API). However,
@@ -24,15 +22,19 @@ module Fog
         # the image belongs to by tracking it in this attribute.
         attribute :project
 
-        # A RawDisk, e.g. -
-        # {
-        #   :source         => url_to_gcs_file,
-        #   :container_type => 'TAR',
-        #   :sha1Checksum   => ,
-        # }
+        # a RawDisk - link to Google Storage file with disk.raw archive
+        # TODO: think if you can use Fog::Storage::Google::File here.
         attribute :raw_disk
 
         attribute :status
+
+        def preferred_kernel=(args)
+          Fog::Logger.deprecation("preferred_kernel= is no longer used [light_black](#{caller.first})[/]")
+        end
+        def preferred_kernel
+          Fog::Logger.deprecation("preferred_kernel is no longer used [light_black](#{caller.first})[/]")
+          nil
+        end
 
         def reload
           requires :name
@@ -47,19 +49,19 @@ module Fog
           requires :name
           requires :raw_disk
 
-          options = { 'description'     => description }
+          options = { 'description' => description }
 
-          operation = service.insert_image(name, raw_disk, options)
-
-          puts "Fog::Image#save -> operation: " + operation.inspect
+          response = service.insert_image(name, raw_disk, options)
+          
+          operation = service.operations.new(response.body)
+          operation.wait
 
           data = service.backoff_if_unfound {
             service.get_image(self.name).body
           }
 
           # Track the name of the project in which we insert the image
-          # data.merge!('project' => service.project)
-          data = {}
+          data.merge!('project' => service.project)
           
           self.project = self.service.project
 
@@ -67,8 +69,16 @@ module Fog
         end
 
         def resource_url
-          # "compute/v1/projects/#{project}/global/images/#{image}"
           "#{self.project}/global/images/#{name}"
+        end
+
+        def delete
+          requires :name
+
+          response = service.delete_image(name)
+
+          operation = service.operations.new(response.body)
+          operation.wait          
         end
 
       end

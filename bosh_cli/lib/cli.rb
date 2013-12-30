@@ -59,11 +59,8 @@ require 'cli/packaging_helper'
 require 'cli/package_builder'
 require 'cli/job_builder'
 require 'cli/changeset_helper'
-require 'cli/task_tracker'
-require 'cli/task_log_renderer'
-require 'cli/event_log_renderer'
-require 'cli/null_renderer'
 require 'cli/deployment_manifest_compiler'
+require 'cli/task_tracking'
 
 require 'cli/release'
 require 'cli/release_builder'
@@ -80,10 +77,6 @@ require 'cli/command_discovery'
 require 'cli/command_handler'
 require 'cli/runner'
 require 'cli/base_command'
-
-tmpdir = Dir.mktmpdir
-at_exit { FileUtils.rm_rf(tmpdir) }
-ENV['TMPDIR'] = tmpdir
 
 Dir[File.dirname(__FILE__) + '/cli/commands/*.rb'].each do |file|
   require file
