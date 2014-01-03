@@ -21,3 +21,9 @@ require "cloud/google/cloud"
 
 
 Dir['cloud/google/**/*.rb'].each { |d| require d }
+
+module Bosh
+  module Clouds
+    Google = Bosh::Google::Cloud
+  end
+end

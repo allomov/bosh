@@ -19,7 +19,7 @@ module Bosh::Google
     # @param [Hash] options cloud options
     def initialize(options)
       @options = options.dup
-      @logger  = Bosh::Clouds::Config.logger 
+      @logger  = Bosh::Clouds::Config.logger
 
 
       validate_options
@@ -27,8 +27,8 @@ module Bosh::Google
       # TODO: move it to helper
       # initialize_google_fog
 
-      # TODO: what does it makes? 
-      # @agent_properties  = @options["agent"] || {} 
+      # TODO: what does it makes?
+      # @agent_properties  = @options["agent"] || {}
       @google_properties = @options["google"]
 
       compute_params = {
@@ -38,7 +38,7 @@ module Bosh::Google
         :google_project      => @google_properties['compute']['project']
       }
 
-      
+
       begin
         @logger.info("Connecting to Compute...")
         @compute = Fog::Compute.new(compute_params)
@@ -55,7 +55,7 @@ module Bosh::Google
       }
 
       begin
-        @logger.info("Connecting to Storage...")        
+        @logger.info("Connecting to Storage...")
         @storage = Fog::Storage.new(storage_params)
       rescue Exception => e
         @logger.error(e)
@@ -71,7 +71,7 @@ module Bosh::Google
     # Get the vm_id of this host
     #
     # @return [String] opaque id later used by other methods of the CPI
-    # TODO: how it should work ? 
+    # TODO: how it should work ?
     # def current_vm_id
     #   not_implemented(:current_vm_id)
     # end
@@ -83,7 +83,7 @@ module Bosh::Google
     # @param [Hash] cloud_properties properties required for creating this template
     #               specific to a CPI
     # @return [String] opaque id later used by {#create_vm} and {#delete_stemcell}
-    # 
+    #
     # I assume here that image_path contains path to the file
     def create_stemcell(image_path, _ = nil)
       @logger.info("Creating stemcell from #{image_path}...")
@@ -95,14 +95,14 @@ module Bosh::Google
             # stemcell_directory = generate_stemcell_directory_name
             stemcell_directory = @storage.directories.find { |d| d.key == 'bosh-stemcell-1' }
             # stemcell_directory = @storage.directories.find { |d| d.key == 'myveryownbucket_huehuehuehue' }
-            
+
             # stemcell_directory = 'bosh-stemcell-1'
             # image_name     = stemcell_image_name(image_path)
 
             image_name = "disk.raw"
             # image_name = "clear_ubuntu.tar.gz"
 
-            # If image_path is set to existing file, then 
+            # If image_path is set to existing file, then
             # from the remote location on a background job and store it in its repository.
             # Otherwise, unpack image to temp directory and upload to Glance the root image.
 
@@ -111,7 +111,7 @@ module Bosh::Google
             #   unpack_image(tmp_dir, image_path)
             #   image_file = File.join(tmp_dir, image_root_file)
             # end
-            
+
             file = nil
             remote do
               # file = stemcell_directory.files.new
@@ -128,9 +128,9 @@ module Bosh::Google
 
             remote { image.save }
 
-            # is it needed ??? 
+            # is it needed ???
             wait_resource(image, :ready)
-            
+
             image.identity.to_s
         rescue => e
           @logger.error(e)
@@ -146,7 +146,7 @@ module Bosh::Google
     # @return [void]
     def delete_stemcell(stemcell_id)
       # TODO: do I need to remove blob here ?
-      remote do 
+      remote do
         stemcell_image = find_by_identity(compute.images, stemcell_id)
         operation = stemcell_image.delete
         operation.wait
@@ -199,11 +199,11 @@ module Bosh::Google
           image        = remote { @compute.images.find  { |f| f.identity == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
           zone_name    =  resource_pool["zone_name"] || 'us-central1-b'
-          server = @compute.servers.bootstrap( name: server_name, 
-                                               source_image: image.name, 
-                                               zone_name: zone_name, 
+          server = @compute.servers.bootstrap( name: server_name,
+                                               source_image: image.name,
+                                               zone_name: zone_name,
                                                machine_type: machine_type)
-          
+
           # is id a name or an id ????
           # server.id.to_s
           @logger.info("Server is created with #{server.identity.to_s} id...")
@@ -247,7 +247,7 @@ module Bosh::Google
     # @return [void]
     def reboot_vm(vm_id)
       remote do
-        @logger.info("Rebooting VM with #{vm_id} id...")        
+        @logger.info("Rebooting VM with #{vm_id} id...")
         operation = find_server_by_identity(vm_id).reboot
         operation.wait
       end
@@ -337,14 +337,14 @@ module Bosh::Google
     # @param [String] disk disk id that was once returned by {#create_disk}
     # @return [void]
     def detach_disk(vm_id, disk_id)
-      remote do 
+      remote do
         @logger.info("Detaching disk with #{disk_id} id to VM with #{vm_id} id...")
         server = find_server_by_identity(vm_id)
         disk = find_by_identity(compute.disks, disk_id)
         operation = server.detach(disk)
         operation.wait
       end
-    end    
+    end
 
     # Take snapshot of disk
     # @param [String] disk_id disk id of the disk to take the snapshot of
@@ -386,7 +386,7 @@ module Bosh::Google
         # https://www.googleapis.com/compute/v1/projects/project/zones/#{zone}/disks/#{disk}
         # server.disks.map { |disk| get_disk disk['source'] }
         server.attached_disks.map { |disk| disk.identity.to_s }
-      end      
+      end
     end
 
   end
