@@ -30,7 +30,7 @@ module Bosh::Google
       @stemcell_directory_name ||= "bosh-stemcells-#{generate_unique_name_from_email}"
     end
 
-    def generate_stemcell_name(options = {})
+    def generate_stemcell_image_name(options = {})
       image = options[:from] || 'stemcell'
       File.basename(image, '.*').tr('^A-Za-z0-9\-', '') + '-' + generate_timestamp
     end

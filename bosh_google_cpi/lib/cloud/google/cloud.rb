@@ -91,47 +91,43 @@ module Bosh::Google
       # TODO: check if we can push tar.gz
       with_thread_name("create_stemcell(#{image_path}...)") do
         begin
-            @logger.info("Creating new image...")
-            # stemcell_directory = generate_stemcell_directory_name
-            stemcell_directory = @storage.directories.find { |d| d.key == 'bosh-stemcell-1' }
-            # stemcell_directory = @storage.directories.find { |d| d.key == 'myveryownbucket_huehuehuehue' }
+          @logger.info("Creating new image...")
 
-            # stemcell_directory = 'bosh-stemcell-1'
-            # image_name     = stemcell_image_name(image_path)
+          # stemcell_directory
+          # stemcell_directory = @storage.directories.find { |d| d.key == stemcell_directory_name }
 
-            image_name = "disk.raw"
-            # image_name = "clear_ubuntu.tar.gz"
+          # stemcell_directory = @storage.directories.find { |d| d.key == 'bosh-stemcell-1' }
+          # stemcell_directory = @storage.directories.find { |d| d.key == 'myveryownbucket_huehuehuehue' }
+          # stemcell_directory = 'bosh-stemcell-1'
 
-            # If image_path is set to existing file, then
-            # from the remote location on a background job and store it in its repository.
-            # Otherwise, unpack image to temp directory and upload to Glance the root image.
+          image_name = generate_stemcell_image_name(from: image_path)
 
-            # Dir.mktmpdir do |tmp_dir|
-            #   @logger.info("Extracting stemcell file to `#{tmp_dir}'...")
-            #   unpack_image(tmp_dir, image_path)
-            #   image_file = File.join(tmp_dir, image_root_file)
-            # end
-
-            file = nil
-            remote do
-              # file = stemcell_directory.files.new
-              # file.key  = image_name
-              # file.body = File.open(image_path, 'r')
-              # @logger.info("Uploading image file #{image_name} into Google Storage...")
-              # file.save
-              file = stemcell_directory.files.to_a.find { |f| f.key == image_name }
-            end
-
-            @logger.info("Create new image..")
+          # image_name = "disk.raw"
+          # image_name = "clear_ubuntu.tar.gz"
+          # If image_path is set to existing file, then
+          # from the remote location on a background job and store it in its repository.
+          # Otherwise, unpack image to temp directory and upload to Glance the root image.
+          # Dir.mktmpdir do |tmp_dir|
+          #   @logger.info("Extracting stemcell file to `#{tmp_dir}'...")
+          #   unpack_image(tmp_dir, image_path)
+          #   image_file = File.join(tmp_dir, image_root_file)
+          # end
+          file = nil
+          remote do
+            @logger.info("Uploading image file #{image_name} into Google Storage...")
+            file = stemcell_directory.files.create(key: image_name, body: File.open(image_path, 'r'))
+            # file = stemcell_directory.files.to_a.find { |f| f.key == image_name }
+          end
+  
+          remote do
+            @logger.info('Create new image..')
             raw_disk_url = "https://storage.googleapis.com/#{stemcell_directory.key}/#{image_name}"
-            image = compute.images.new(name: generate_stemcell_name(from: image_path), raw_disk: raw_disk_url)
+            image = compute.images.create(name: image_name, raw_disk: raw_disk_url)
+            # location: 'US'
+          end
 
-            remote { image.save }
-
-            # is it needed ???
-            wait_resource(image, :ready)
-
-            image.identity.to_s
+          wait_resource(image, :ready)
+          image.identity.to_s
         rescue => e
           @logger.error(e)
           raise e
