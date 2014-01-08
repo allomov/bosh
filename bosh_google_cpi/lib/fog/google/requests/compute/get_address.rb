@@ -4,24 +4,20 @@ module Fog
 
       class Mock
 
-        def delete_snapshot(snapshot_name, zone_name)
+        def get_address(address_name, region_name)
           Fog::Mock.not_implemented
-        end  
+        end
 
       end
 
       class Real
 
-        def delete_snapshot(snapshot_name, zone_name)
-          if zone_name.start_with? 'http'
-            zone_name = zone_name.split('/')[-1]
-          end
-
-          api_method = @compute.snapshots.delete
+        def get_address(address_name, region_name)
+          api_method = @compute.addresses.get
           parameters = {
             'project' => @project,
-            'snapshot' => snapshot_name,
-            'zone' => zone_name,
+            'address' => address_name,
+            'region' => region_name
           }
 
           result = self.build_result(api_method, parameters)

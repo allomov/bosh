@@ -63,7 +63,7 @@ module Fog
             new_attributes[:source_image] = new_attributes[:image_name] if new_attributes[:image_name]
 
             disk = service.disks.create(disk_defaults.merge(new_attributes))
-            disk.wait_for { ready? }
+            disk.wait_for { disk.ready? }
             disks = [disk]
           end
 
@@ -72,13 +72,12 @@ module Fog
             :disks => disks,
             :machine_type => "n1-standard-1",
             :zone_name => zone,
-            :private_key_path => File.expand_path("~/.ssh/google_id_rsa"),
-            :public_key_path => File.expand_path("~/.ssh/google_id_rsa.pub"),
+            :private_key_path => File.expand_path("~/.ssh/id_rsa"),
+            :public_key_path => File.expand_path("~/.ssh/id_rsa.pub"),
             :username => ENV['USER'],
           }
 
-          server = new(defaults.merge(new_attributes))
-          server.save
+          server = create(defaults.merge(new_attributes))
           server.wait_for { sshable? }
 
           server
