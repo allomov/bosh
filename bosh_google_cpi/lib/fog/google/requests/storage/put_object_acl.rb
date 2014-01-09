@@ -23,25 +23,7 @@ module Fog
           end.join("\n")
         end
 
-        # Change access control list for an Google Storage bucket
-        #
-        # ==== Parameters
-        # * bucket_name<~String> - name of bucket to modify
-        # * acl<~Hash>:
-        #   * Owner<~Hash>:
-        #     * ID<~String>: id of owner
-        #   * AccessControlList<~Array>:
-        #     * scope<~Hash>:
-        #         * 'type'<~String> - 'UserById'
-        #         * 'ID'<~String> - Id of grantee
-        #       or
-        #         * 'type'<~String> - 'UserByEmail'
-        #         * 'EmailAddress'<~String> - Email address of grantee
-        #       or
-        #         * 'type'<~String> - type of user to grant permission to
-        #     * Permission<~String> - Permission, in [FULL_CONTROL, WRITE, WRITE_ACP, READ, READ_ACP]
-        def put_bucket_acl(bucket_name, acl)
-          # acl = new_acl.dup
+        def put_object_acl(bucket_name, object_name, acl)
 
           data = <<-DATA
 <AccessControlList>
@@ -49,13 +31,10 @@ module Fog
     #{tag('ID', acl['Owner']['ID'])}
   </Owner>
   <Entries>
-    #{entries_list(acl['AccessControlList'].dup)}
+    #{entries_list(acl['AccessControlList'])}
   </Entries>
 </AccessControlList>
 DATA
-
-puts "REQUEST!!"
-puts data
 
           request({
             :body     => data,
@@ -63,8 +42,10 @@ puts data
             :headers  => {},
             :host     => "#{bucket_name}.#{@host}",
             :method   => 'PUT',
-            :query    => {'acl' => nil}
+            :query    => {'acl' => nil},
+            :path     => CGI.escape(object_name)
           })
+
         end
 
       end

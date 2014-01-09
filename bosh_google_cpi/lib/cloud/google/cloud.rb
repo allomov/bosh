@@ -116,14 +116,20 @@ module Bosh::Google
           remote do
             @logger.info("Uploading image file #{image_name} into Google Storage...")
             file = stemcell_directory.files.create(key: image_name, body: File.open(image_path, 'r'))
+            file.add_acl('AllUsers', 'READ')
+            # file = stemcell_directory.files.create(key: image_name, 
+            #                                        body: File.open(image_path, 'r')
+            #                                        acl: { entiny: 'allAuthenticatedUsers', role: 'READER' },
+            #                                        location: 'US')
             # file = stemcell_directory.files.to_a.find { |f| f.key == image_name }
           end
   
           remote do
             @logger.info('Create new image..')
             raw_disk_url = "https://storage.googleapis.com/#{stemcell_directory.key}/#{image_name}"
-            image = compute.images.create(name: image_name, raw_disk: raw_disk_url)
-            # location: 'US'
+            image = compute.images.create(name: image_name, 
+                                          raw_disk: raw_disk_url)
+
           end
 
           wait_resource(image, :ready)

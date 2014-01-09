@@ -47,9 +47,9 @@ module Bosh::Google
       if direcrtory.nil?
         @logger.info("Creating directory (#{stemcell_directory_name})...")
         remote do 
-          direcrtory = @storage.directories.new
-          direcrtory.key = stemcell_directory_name
-          direcrtory.save
+          direcrtory = @storage.directories.create(key: stemcell_directory_name)
+          direcrtory.add_acl('AllUsers', 'READ')
+          # direcrtory.add_acl({entity: 'allAuthenticatedUsers', role: 'READER'})
         end
       end
       direcrtory
