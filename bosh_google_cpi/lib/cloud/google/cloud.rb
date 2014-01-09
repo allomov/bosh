@@ -114,7 +114,7 @@ module Bosh::Google
           # end
           file = nil
           remote do
-            @logger.info("Uploading image file #{image_name} into Google Storage...")
+            @logger.info("Uploading image file #{image_name} into Google Storage to #{stemcell_directory.key} bucket...")
             file = stemcell_directory.files.create(key: image_name, body: File.open(image_path, 'r'))
             file.add_acl('AllUsers', 'READ')
             # file = stemcell_directory.files.create(key: image_name, 
@@ -124,6 +124,7 @@ module Bosh::Google
             # file = stemcell_directory.files.to_a.find { |f| f.key == image_name }
           end
   
+          image = nil
           remote do
             @logger.info('Create new image..')
             raw_disk_url = "https://storage.googleapis.com/#{stemcell_directory.key}/#{image_name}"
@@ -132,7 +133,9 @@ module Bosh::Google
 
           end
 
-          wait_resource(image, :ready)
+          # we don't need to wait here because create image is synchronous
+          # wait_resource(image, :ready)
+
           image.identity.to_s
         rescue => e
           @logger.error(e)
