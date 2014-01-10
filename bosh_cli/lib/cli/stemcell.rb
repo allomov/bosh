@@ -35,7 +35,7 @@ module Bosh::Cli
         if entry.full_name == stemcell_mf
           tar.extract_entry(tmp_dir, entry)
           manifest = true
-        elsif entry.full_name == "image"
+        elsif entry.full_name == "image" || entry.full_name == "disk.raw"
           image = true
         end
       end
