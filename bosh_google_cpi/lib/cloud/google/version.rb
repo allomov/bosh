@@ -1,7 +1,5 @@
-# Copyright (c) 2009-2012 VMware, Inc.
-
 module Bosh
   module Google
-    VERSION = '1.5.0.pre.local'
+    VERSION = '1.1750.0'
   end
 end

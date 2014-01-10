@@ -1,6 +1,7 @@
-# -*- encoding: utf-8 -*-
+# coding: utf-8
+require File.expand_path('../lib/cloud/google/version', __FILE__)
 
-version = File.read(File.expand_path('../../BOSH_VERSION', __FILE__)).strip
+version = Bosh::Google::VERSION
 
 Gem::Specification.new do |s|
   s.name         = 'bosh_google_cpi'
