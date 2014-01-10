@@ -18,12 +18,6 @@ func NewSha1Verifiable(blobstore Blobstore) Blobstore {
 	}
 }
 
-func (b sha1Verifiable) ApplyOptions(opts map[string]string) (updated Blobstore, err error) {
-	b.blobstore, err = b.blobstore.ApplyOptions(opts)
-	updated = b
-	return
-}
-
 func (b sha1Verifiable) Get(blobId, fingerprint string) (fileName string, err error) {
 	fileName, err = b.blobstore.Get(blobId, fingerprint)
 	if err != nil {
@@ -72,4 +66,8 @@ func calculateSha1(fileName string) (fingerprint string, err error) {
 	io.Copy(h, file)
 	fingerprint = fmt.Sprintf("%x", h.Sum(nil))
 	return
+}
+
+func (b sha1Verifiable) Validate() (err error) {
+	return b.blobstore.Validate()
 }

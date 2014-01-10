@@ -3,6 +3,7 @@ package app
 import (
 	boshagent "bosh/agent"
 	boshaction "bosh/agent/action"
+	boshalert "bosh/agent/alert"
 	boshappl "bosh/agent/applier"
 	boshas "bosh/agent/applier/applyspec"
 	boshcomp "bosh/agent/compiler"
@@ -12,10 +13,10 @@ import (
 	boshboot "bosh/bootstrap"
 	bosherr "bosh/errors"
 	boshinf "bosh/infrastructure"
+	boshjobsuper "bosh/jobsupervisor"
+	boshmonit "bosh/jobsupervisor/monit"
 	boshlog "bosh/logger"
 	boshmbus "bosh/mbus"
-	boshmon "bosh/monitor"
-	boshmonit "bosh/monitor/monit"
 	boshnotif "bosh/notification"
 	boshplatform "bosh/platform"
 	boshdirs "bosh/settings/directories"
@@ -31,6 +32,7 @@ type app struct {
 type options struct {
 	InfrastructureName string
 	PlatformName       string
+	BaseDirectory      string
 }
 
 func New(logger boshlog.Logger) (app app) {
@@ -45,14 +47,7 @@ func (app app) Run(args []string) (err error) {
 		return
 	}
 
-	dirProvider := boshdirs.NewDirectoriesProvider("/var/vcap")
-
-	infProvider := boshinf.NewProvider(app.logger)
-	infrastructure, err := infProvider.Get(opts.InfrastructureName)
-	if err != nil {
-		err = bosherr.WrapError(err, "Getting infrastructure")
-		return
-	}
+	dirProvider := boshdirs.NewDirectoriesProvider(opts.BaseDirectory)
 
 	platformProvider := boshplatform.NewProvider(app.logger, dirProvider)
 	platform, err := platformProvider.Get(opts.PlatformName)
@@ -61,7 +56,14 @@ func (app app) Run(args []string) (err error) {
 		return
 	}
 
-	boot := boshboot.New(infrastructure, platform)
+	infProvider := boshinf.NewProvider(app.logger, platform.GetFs(), dirProvider)
+	infrastructure, err := infProvider.Get(opts.InfrastructureName)
+	if err != nil {
+		err = bosherr.WrapError(err, "Getting infrastructure")
+		return
+	}
+
+	boot := boshboot.New(infrastructure, platform, dirProvider)
 	settingsService, err := boot.Run()
 	if err != nil {
 		err = bosherr.WrapError(err, "Running bootstrap")
@@ -75,7 +77,7 @@ func (app app) Run(args []string) (err error) {
 		return
 	}
 
-	blobstoreProvider := boshblob.NewProvider(platform)
+	blobstoreProvider := boshblob.NewProvider(platform, dirProvider)
 	blobstore, err := blobstoreProvider.Get(settingsService.GetBlobstore())
 	if err != nil {
 		err = bosherr.WrapError(err, "Getting blobstore")
@@ -89,16 +91,16 @@ func (app app) Run(args []string) (err error) {
 		return
 	}
 
-	monitor := boshmon.NewMonit(platform.GetFs(), platform.GetRunner(), monitClient, app.logger)
+	jobSupervisor := boshjobsuper.NewMonitJobSupervisor(platform.GetFs(), platform.GetRunner(), monitClient, app.logger, dirProvider)
 	notifier := boshnotif.NewNotifier(mbusHandler)
-	applier := boshappl.NewApplierProvider(platform, blobstore, monitor, dirProvider).Get()
+	applier := boshappl.NewApplierProvider(platform, blobstore, jobSupervisor, dirProvider).Get()
 	compiler := boshcomp.NewCompilerProvider(platform, blobstore, dirProvider).Get()
 
 	taskService := boshtask.NewAsyncTaskService(app.logger)
 
 	specFilePath := filepath.Join(dirProvider.BaseDir(), "bosh", "spec.json")
 	specService := boshas.NewConcreteV1Service(platform.GetFs(), specFilePath)
-	drainScriptProvider := boshdrain.NewDrainScriptProvider(platform.GetRunner(), platform.GetFs(), dirProvider)
+	drainScriptProvider := boshdrain.NewConcreteDrainScriptProvider(platform.GetRunner(), platform.GetFs(), dirProvider)
 
 	actionFactory := boshaction.NewFactory(
 		settingsService,
@@ -108,15 +110,15 @@ func (app app) Run(args []string) (err error) {
 		notifier,
 		applier,
 		compiler,
-		monitor,
+		jobSupervisor,
 		specService,
-		dirProvider,
 		drainScriptProvider,
 	)
 	actionRunner := boshaction.NewRunner()
 	actionDispatcher := boshagent.NewActionDispatcher(app.logger, taskService, actionFactory, actionRunner)
+	alertBuilder := boshalert.NewBuilder(settingsService, app.logger)
 
-	agent := boshagent.New(settingsService, app.logger, mbusHandler, platform, actionDispatcher)
+	agent := boshagent.New(app.logger, mbusHandler, platform, actionDispatcher, alertBuilder, jobSupervisor)
 	err = agent.Run()
 	if err != nil {
 		err = bosherr.WrapError(err, "Running agent")
@@ -129,6 +131,7 @@ func parseOptions(args []string) (opts options, err error) {
 	flagSet.SetOutput(ioutil.Discard)
 	flagSet.StringVar(&opts.InfrastructureName, "I", "", "Set Infrastructure")
 	flagSet.StringVar(&opts.PlatformName, "P", "", "Set Platform")
+	flagSet.StringVar(&opts.BaseDirectory, "B", "/var/vcap", "Set Base Directory")
 
 	err = flagSet.Parse(args[1:])
 	return

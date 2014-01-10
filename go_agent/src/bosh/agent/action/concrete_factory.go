@@ -8,11 +8,11 @@ import (
 	boshtask "bosh/agent/task"
 	boshblob "bosh/blobstore"
 	bosherr "bosh/errors"
-	boshmon "bosh/monitor"
+	boshjobsuper "bosh/jobsupervisor"
 	boshnotif "bosh/notification"
 	boshplatform "bosh/platform"
+	boshntp "bosh/platform/ntp"
 	boshsettings "bosh/settings"
-	boshdirs "bosh/settings/directories"
 )
 
 type concreteFactory struct {
@@ -27,12 +27,14 @@ func NewFactory(
 	notifier boshnotif.Notifier,
 	applier boshappl.Applier,
 	compiler boshcomp.Compiler,
-	monitor boshmon.Monitor,
+	jobSupervisor boshjobsuper.JobSupervisor,
 	specService boshas.V1Service,
-	dirProvider boshdirs.DirectoriesProvider,
 	drainScriptProvider boshdrain.DrainScriptProvider,
 ) (factory Factory) {
 	compressor := platform.GetCompressor()
+	dirProvider := platform.GetDirProvider()
+	vitalsService := platform.GetVitalsService()
+	ntpService := boshntp.NewConcreteService(platform.GetFs(), dirProvider)
 
 	factory = concreteFactory{
 		availableActions: map[string]Action{
@@ -40,15 +42,15 @@ func NewFactory(
 			"drain":        newDrain(notifier, specService, drainScriptProvider),
 			"fetch_logs":   newLogs(compressor, blobstore, dirProvider),
 			"get_task":     newGetTask(taskService),
-			"get_state":    newGetState(settings, specService, monitor),
+			"get_state":    newGetState(settings, specService, jobSupervisor, vitalsService, ntpService),
 			"list_disk":    newListDisk(settings, platform),
 			"migrate_disk": newMigrateDisk(settings, platform, dirProvider),
 			"mount_disk":   newMountDisk(settings, platform, dirProvider),
 			"ping":         newPing(),
 			"prepare_network_change": newPrepareNetworkChange(),
 			"ssh":             newSsh(settings, platform, dirProvider),
-			"start":           newStart(monitor),
-			"stop":            newStop(monitor),
+			"start":           newStart(jobSupervisor),
+			"stop":            newStop(jobSupervisor),
 			"unmount_disk":    newUnmountDisk(settings, platform),
 			"compile_package": newCompilePackage(compiler),
 		},

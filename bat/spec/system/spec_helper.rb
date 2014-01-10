@@ -34,13 +34,17 @@ RSpec.configure do |config|
     $?.exitstatus.should == 0
   end
 
-  config.before(:each) do
-    requirement :no_tasks_processing unless example.metadata[:skip_task_check]
+  config.before do |example|
+    unless example.metadata[:skip_task_check]
+      requirement :no_tasks_processing
+    end
   end
 end
 
 RSpec::Matchers.define :succeed do |_|
-  match { |actual| actual.exit_status == 0 }
+  match do |actual|
+    expect(actual.exit_status).to eq 0
+  end
 
   failure_message_for_should do |actual|
     'expected command to exit with 0 but was ' +
@@ -49,30 +53,31 @@ RSpec::Matchers.define :succeed do |_|
 end
 
 RSpec::Matchers.define :succeed_with do |expected|
-  expect_string = expected.instance_of?(String)
-  expect_regex  = expected.instance_of?(Regexp)
-
   match do |actual|
-    if actual.exit_status != 0
-      false
-    elsif expect_string
-      actual.output == expected
-    elsif expect_regex
-      !!actual.output.match(expected)
-    else
-      raise ArgumentError, "don't know what to do with a #{expected.class}"
+    expect(actual.exit_status).to eq 0
+
+    case expected
+      when String
+        expect(actual.output).to eq(expected)
+      when Regexp
+        # See https://www.relishapp.com/rspec/rspec-expectations/v/2-14/docs/
+        # custom-matchers/define-matcher#matching-against-a-regular-expression
+        expect(actual.output).to match_regex(expected)
+      else
+        raise ArgumentError, "don't know what to do with a #{expected.class}"
     end
   end
 
   failure_message_for_should do |actual|
-    if expect_string
-      what = 'be'
-      exp = expected
-    elsif expect_regex
-      what = 'match'
-      exp = "/#{expected.source}/"
-    else
-      raise ArgumentError, "don't know what to do with a #{expected.class}"
+    case expected
+      when String
+        what = 'be'
+        exp = expected
+      when Regexp
+        what = 'match'
+        exp = "/#{expected.source}/"
+      else
+        raise ArgumentError, "don't know what to do with a #{expected.class}"
     end
 
     'expected command to exit with 0 but was ' +

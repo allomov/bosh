@@ -3,7 +3,10 @@ package platform
 import (
 	boshcmd "bosh/platform/commands"
 	boshstats "bosh/platform/stats"
+	boshvitals "bosh/platform/vitals"
+	fakevitals "bosh/platform/vitals/fakes"
 	boshsettings "bosh/settings"
+	boshdir "bosh/settings/directories"
 	boshsys "bosh/system"
 	fakesys "bosh/system/fakes"
 )
@@ -28,6 +31,14 @@ func (p dummyPlatform) GetStatsCollector() (collector boshstats.StatsCollector) 
 
 func (p dummyPlatform) GetCompressor() (compressor boshcmd.Compressor) {
 	return boshcmd.DummyCompressor{}
+}
+
+func (p dummyPlatform) GetDirProvider() (dirProvider boshdir.DirectoriesProvider) {
+	return boshdir.NewDirectoriesProvider("/var/vcap")
+}
+
+func (p dummyPlatform) GetVitalsService() (service boshvitals.Service) {
+	return fakevitals.NewFakeService()
 }
 
 func (p dummyPlatform) SetupRuntimeConfiguration() (err error) {
