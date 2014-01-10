@@ -1,3 +1,7 @@
+
+# TODO: remove after fog is updated 
+require 'mime/types'
+
 module Bosh
   module Google
   end

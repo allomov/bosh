@@ -226,7 +226,7 @@ module Bosh::Deployer
         properties['cloud_properties'].merge!(override) if override
 
         step 'Uploading stemcell' do
-          cloud.create_stemcell("#{stemcell}/image", properties['cloud_properties'])
+          cloud.create_stemcell("#{stemcell}/disk.raw", properties['cloud_properties'])
         end
       end
     rescue => e
