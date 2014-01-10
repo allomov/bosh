@@ -121,7 +121,7 @@ module Bosh::Deployer
 
       def discover_bosh_ip
         if exists?
-          floating_ip = cloud.google.servers.get(state.vm_cid).floating_ip_address
+          floating_ip = cloud.compute.servers.get(state.vm_cid).floating_ip_address
           ip = floating_ip || service_ip
 
           if ip != Config.bosh_ip
@@ -134,13 +134,13 @@ module Bosh::Deployer
       end
 
       def service_ip
-        cloud.google.servers.get(state.vm_cid).private_ip_address
+        cloud.compute.servers.get(state.vm_cid).private_ip_address
       end
 
       # @return [Integer] size in MiB
       def disk_size(cid)
         # Google stores disk size in GiB but we work with MiB
-        cloud.google.volumes.get(cid).size * 1024
+        cloud.compute.volumes.get(cid).size * 1024
       end
 
       def persistent_disk_changed?
