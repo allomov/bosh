@@ -52,8 +52,8 @@ describe Bosh::Google::Cloud do
     it "kill them all" do
 
       cpi.compute.images.map do |image|
-        image.delete
-      end.each { |operation| operation.wait }
+        image.delete rescue nil
+      end.each { |operation| operation.wait if operation }
 
     end
 
