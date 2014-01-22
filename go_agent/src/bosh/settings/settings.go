@@ -19,9 +19,7 @@ type Settings struct {
 }
 
 const (
-	BlobstoreTypeDav   = "dav"
 	BlobstoreTypeDummy = "dummy"
-	BlobstoreTypeS3    = "s3"
 	BlobstoreTypeLocal = "local"
 )
 

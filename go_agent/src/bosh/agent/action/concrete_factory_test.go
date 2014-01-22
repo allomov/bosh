@@ -46,6 +46,7 @@ func TestNewFactory(t *testing.T) {
 		"stop",
 		"unmount_disk",
 		"compile_package",
+		"release_apply_spec",
 	}
 
 	_, factory := buildFactory()
@@ -82,7 +83,7 @@ func TestNewFactoryFetchLogs(t *testing.T) {
 	action, err := factory.Create("fetch_logs")
 	assert.NoError(t, err)
 	assert.NotNil(t, action)
-	assert.Equal(t, newLogs(deps.platform.GetCompressor(), deps.blobstore, deps.platform.GetDirProvider()), action)
+	assert.Equal(t, newLogs(deps.platform.GetCompressor(), deps.platform.GetCopier(), deps.blobstore, deps.platform.GetDirProvider()), action)
 }
 
 func TestNewFactoryGetTask(t *testing.T) {

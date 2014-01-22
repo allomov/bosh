@@ -45,9 +45,12 @@ module Bosh::Dev::Openstack
               'address' => env['BOSH_OPENSTACK_VIP_DIRECTOR_IP']
             }
           },
-          'properties' => {}
+          'properties' => {
+            'director' => {
+              'max_vm_create_tries' => 15
+            },
+          },
         },
-        'max_vm_create_tries' => 15,
       }
 
       result['network']['ip'] = env['BOSH_OPENSTACK_MANUAL_IP'] if net_type == 'manual'
@@ -72,6 +75,9 @@ module Bosh::Dev::Openstack
           'default_security_groups' => ['default'],
           'private_key' => env['BOSH_OPENSTACK_PRIVATE_KEY'],
           'state_timeout' => state_timeout,
+          'connection_options' => {
+            'connect_timeout' => connection_timeout,
+          }
         },
         'registry' => {
           'endpoint' => 'http://admin:admin@localhost:25889',
@@ -88,6 +94,11 @@ module Bosh::Dev::Openstack
     def state_timeout
       timeout = env['BOSH_OPENSTACK_STATE_TIMEOUT']
       timeout.to_s.empty? ? 300.0 : timeout.to_f
+    end
+
+    def connection_timeout
+      timeout = env['BOSH_OPENSTACK_CONNECTION_TIMEOUT']
+      timeout.to_s.empty? ? 60.0 : timeout.to_f
     end
   end
 end

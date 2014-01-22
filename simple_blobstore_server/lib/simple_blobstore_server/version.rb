@@ -1,3 +1,3 @@
 module Bosh::SimpleBlobstoreServer
-  VERSION = '1.1750.0'
+  VERSION = '1.1798.0'
 end
