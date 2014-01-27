@@ -157,7 +157,7 @@ module Bosh::Google
       remote do
         stemcell_image = find_by_identity(compute.images, stemcell_id)
         operation = stemcell_image.delete
-        operation.wait
+        operation.wait_for { ready? }
       end
     end
 
@@ -230,7 +230,7 @@ module Bosh::Google
       remote do
         @logger.info("Removing VM with #{vm_id} id...")
         operation = find_server_by_identity(vm_id).delete
-        operation.wait
+        operation.wait_for { ready? }
         @logger.info("VM is removed...")
       end
     end
@@ -257,7 +257,7 @@ module Bosh::Google
       remote do
         @logger.info("Rebooting VM with #{vm_id} id...")
         operation = find_server_by_identity(vm_id).reboot
-        operation.wait
+        operation.wait_for { ready? }
       end
     end
 
@@ -274,7 +274,7 @@ module Bosh::Google
         @logger.info("Set VM with #{vm_id} id metadata #{metadata.inspect}...")
         server = find_server_by_identity(vm_id)
         operation = server.set_metadata(metadata)
-        operation.wait
+        operation.wait_for { ready? }
       end
     end
 
@@ -318,7 +318,7 @@ module Bosh::Google
         @logger.info("Removing disk with #{disk_id} id...")
         disk = find_by_identity(compute.disks, disk_id)
         operation = disk.delete
-        operation.wait
+        operation.wait_for { ready? }
       end
     end
 
@@ -334,7 +334,7 @@ module Bosh::Google
         server = find_server_by_identity(vm_id)
         disk   = find_by_identity(compute.disks, disk_id)
         operation = server.attach(disk)
-        operation.wait
+        operation.wait_for { ready? }
       end
     end
 
@@ -350,7 +350,7 @@ module Bosh::Google
         server = find_server_by_identity(vm_id)
         disk = find_by_identity(compute.disks, disk_id)
         operation = server.detach(disk)
-        operation.wait
+        operation.wait_for { ready? }
       end
     end
 
@@ -375,7 +375,7 @@ module Bosh::Google
         @logger.info("Removing Snapshot #{snapshot_id}")
         snapshot = find_by_identity(compute.snapshots, snapshot_id)
         operation = snapshot.delete
-        operation.wait
+        operation.wait_for { ready? }
       end
     end
 

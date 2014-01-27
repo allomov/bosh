@@ -6,28 +6,33 @@ require "logger"
 describe Bosh::Google::Cloud do
 
   before(:all) do
-    %w(client_email key_location project storage_access_key storage_secret
-                    manual_ip region net_id manual_ip).each do |attribute|
+    @config = {}
+    %w(client_email key_location project storage_access_key storage_secret).each do |attribute|
       variable_name  = :"@#{attribute}"
       bosh_key_name  = "BOSH_GOOGLE_#{attribute.upcase}"
       variable_value = ENV[bosh_key_name] || raise("Missing #{bosh_key_name}")
-      instance_varibale_set(variable_name, variable_value)
+      @config[attribute.to_sym] = variable_value
     end
   end
+
+  before do
+    delegate = double("delegate", task_checkpoint: nil, logger: Logger.new(STDOUT))
+    Bosh::Clouds::Config.configure(delegate)
+  end
+
 
   subject(:cpi) do
     described_class.new(
       # TODO: simplify it 
-      # client_email key_location project storage_access_key storage_secret
       'google' => {
         'compute' => {
-          'client_email' => @client_email,
-          'key_location' => @key_location,
-          'project' => @project
+          'client_email' => @config[:client_email],
+          'key_location' => @config[:key_location],
+          'project' => @config[:project]
         }, 
         'storage' => {
-          'access_key' => @storage_access_key,
-          'secret' => @storage_secret
+          'access_key' => @config[:storage_access_key],
+          'secret' => @config[:storage_secret]
         },
         "endpoint_type" => "publicURL",
         "default_key_name" => "some_secret",

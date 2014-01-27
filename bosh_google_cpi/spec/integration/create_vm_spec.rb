@@ -56,7 +56,7 @@ describe Bosh::Google::Cloud do
 
       vm_id = cpi.create_vm('agent_id', stemcell_id, {'machine_type' => 'g1-small', 'zone_name' => 'us-central1-b'})
       # check if VM exists 
-      cpi.has_vm?(vm_id).should be_true
+      cpi.has_vm?(vm_id).should eql(true)
 
       cpi.set_vm_metadata(vm_id, { metadata: 'Hodor!' })
       # check VM metadata
