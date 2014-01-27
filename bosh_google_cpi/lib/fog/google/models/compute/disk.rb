@@ -1,5 +1,4 @@
 require 'fog/core/model'
-require 'fog/google/helpers/attribute_converter'
 
 module Fog
   module Compute
@@ -7,9 +6,6 @@ module Fog
 
       class Disk < Fog::Model
 
-        include Fog::Compute::Google::AttributeConverter
-
-        # this is not identity as I understand, the :id is uniq identificator 
         identity :name
 
         attribute :kind, :aliases => 'kind'
@@ -24,8 +20,6 @@ module Fog
         attribute :source_snapshot, :aliases => 'sourceSnapshot'
         attribute :source_snapshot_id, :aliases => 'sourceSnapshot'
 
-        convert_attribute :zone_name
-
         def save
           requires :name, :zone_name
 
@@ -38,7 +32,7 @@ module Fog
 
           response = service.insert_disk(name, zone_name, source_image, options)
           operation = service.operations.new(response.body)
-          operation.wait
+          operation.wait_for { ready? }
 
           data = service.backoff_if_unfound { service.get_disk(name, zone_name).body }
 
@@ -50,7 +44,6 @@ module Fog
         def destroy
           requires :name, :zone_name
           operation = service.operations.new(service.delete_disk(name, zone_name).body)
-          operation.wait_for { !pending? }
           operation 
         end
         alias_method :delete, :destroy
@@ -81,8 +74,6 @@ module Fog
         end
 
         def ready?
-          data = service.get_disk(self.name, self.zone_name).body
-          self.merge_attributes(data)
           self.status == RUNNING_STATE
         end
 
@@ -101,11 +92,11 @@ module Fog
           self
         end
 
-        def create_snapshot(snapshot_name, snapshot_description = "")
+        def create_snapshot(snapshot_name, snapshot_description = '')
           requires :name, :zone_name
 
-          if snapshot_name.nil? or snapshot_name.empty?
-            raise ArgumentError, 'Invalid snapshot name'
+          if snapshot_name.nil? || snapshot_name.empty?
+            raise(ArgumentError, 'Invalid snapshot name')
           end
 
           options = {
@@ -115,16 +106,15 @@ module Fog
 
           response = service.insert_snapshot(name, zone_name, options)
           operation = service.operations.new(response.body)
-          operation.wait
+          operation.wait_for { ready? }
 
-          data = service.backoff_if_unfound { service.get_snapshot(snapshot_name).body }
-          # service.snapshots.merge_attributes(data)
-
-          # Try to return the representation of the snapshot we created
-          service.snapshots.get(snapshot_name)
+          response = service.backoff_if_unfound { service.get_snapshot(snapshot_name) }
+          attributes = response.body
+          snapshot = service.snapshots.new(attributes)
+          snapshot
         end
 
-        RUNNING_STATE = "READY"
+        RUNNING_STATE = 'READY'
 
       end
     end

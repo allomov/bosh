@@ -1,13 +1,11 @@
 require 'fog/compute/models/server'
 require 'net/ssh/proxy/command'
-require 'fog/google/helpers/attribute_converter'
 
 module Fog
   module Compute
     class Google
 
       class Server < Fog::Compute::Server
-        include Fog::Compute::Google::AttributeConverter
 
         identity :name
 
@@ -21,9 +19,6 @@ module Fog
         attribute :metadata
         attribute :tags, :squash => 'items'
         attribute :self_link, :aliases => 'selfLink'
-
-        convert_attribute :zone_name
-        convert_attribute :machine_type
 
         def image_name=(args)
           Fog::Logger.deprecation("image_name= is no longer used [light_black](#{caller.first})[/]")
@@ -151,17 +146,11 @@ module Fog
 
           response = service.insert_server(name, zone_name, options)
 
-          # handle errors in response.error ???
-          # maybe do it in another thread ???
-          # maybe do it asynchronously
           operation = service.operations.new(response.body)
-          operation.wait
-          
-          # check if server is available
-          data = service.backoff_if_unfound { service.get_server(self.name, self.zone_name).body }
+          operation.wait_for { ready? }
 
-          # service.servers.merge_attributes(data)
-          self.merge_attributes(data)
+          data = service.backoff_if_unfound { service.get_server(self.name, self.zone_name).body }
+          merge_attributes(data)
 
           self
         end

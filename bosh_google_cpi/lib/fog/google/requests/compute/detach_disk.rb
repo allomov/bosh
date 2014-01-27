@@ -12,17 +12,13 @@ module Fog
 
       class Real
 
-        def detach_disk(instance_name, device_name, zone_name, options = {})
-
+        def detach_disk(instance_name, zone_name_or_url, device_name)
           api_method = @compute.instances.detach_disk
-          parameters = {
-            'project' => @project,
-            'instance' => instance_name,
-            'zone' => zone_name, 
-            'deviceName' => device_name
-          }
-
-          result = self.build_result(api_method, parameters)
+          
+          parameters = instance_request_parameters(instance_name, zone_name_or_url)
+          parameters.medrge!({ 'deviceName' => device_name })
+          
+          result = self.build_result(api_method, parameters, body_object)
           response = self.build_response(result)
         end
 

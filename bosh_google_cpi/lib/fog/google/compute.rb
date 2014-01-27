@@ -5,6 +5,8 @@ module Fog
   module Compute
     class Google < Fog::Service
 
+      require 'fog/google/helpers/requests_helper'
+
       requires :google_project
       requires :google_client_email
       requires :google_key_location
@@ -36,6 +38,7 @@ module Fog
 
       request :delete_address
       request :delete_disk
+      request :delete_snapshot
       request :delete_firewall
       request :delete_image
       request :delete_network
@@ -53,13 +56,11 @@ module Fog
       request :insert_snapshot
 
       request :set_metadata
+      request :set_tags
 
       request :reset_server
       request :attach_disk
       request :detach_disk
-
-      request :set_tags
-
 
       model_path 'fog/google/models/compute'
       model :server
@@ -133,7 +134,6 @@ module Fog
           end
           result
         end
-
       end
 
       class Mock
@@ -833,7 +833,7 @@ module Fog
           @data = nil
         end
 
-        def data(project = @project)
+        def data(project=@project)
           self.class.data(api_version)[project]
         end
 
@@ -850,6 +850,8 @@ module Fog
       class Real
         include Collections
         include Shared
+
+        attr_reader :client, :compute, :api_url
 
         def initialize(options)
           base_url = 'https://www.googleapis.com/compute/'
