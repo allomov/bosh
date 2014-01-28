@@ -11,6 +11,10 @@ module Fog
           build_url(zone_name_or_url) { |zone_name| "#{url_prefix}/zones/#{zone_name}" }
         end
 
+        def get_machine_type_name(machine_type_name_or_url)
+          get_name(machine_type_name_or_url)
+        end
+
         def get_machine_type_url(machine_type_name_or_url)
           build_url(zone_name_or_url) { |machine_type_name| "#{url_prefix}/zones/#{zone_name}/machineTypes/#{machine_type_name}" }
         end

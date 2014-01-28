@@ -53,7 +53,7 @@ describe Bosh::Google::Cloud do
 
       cpi.compute.images.map do |image|
         image.delete rescue nil
-      end.each { |operation| operation.wait if operation }
+      end.each { |operation| operation.wait_for { ready? } if operation }
 
     end
 

@@ -53,7 +53,7 @@ describe Bosh::Google::Cloud do
 
       cpi.compute.disks.map do |disk|
         disk.delete
-      end.each { |operation| operation.wait }
+      end.each { |operation| operation.wait_for { ready? } }
 
     end
 

@@ -105,7 +105,16 @@ module Bosh::Google
           file = nil
           remote do
             file_name = File.basename(image_path)
+            image_directory = File.dirname(image_path)
+            if file_name == 'disk.raw'
+              @logger.info("Packing disk.raw file to tar.gz archive")
+              file_name = 'stemcell.tar.gz'
+              archive_path = File.join(image_directory, file_name)
+              run_command("tar -cvzf #{archive_path} #{image_path}")
+              stemcell_path = archive_path
+            end
             file = stemcell_directory.files.find { |f| f.key == file_name }
+
             if file.nil?
               @logger.info("Uploading image file #{file_name} into Google Storage to #{stemcell_directory.key} bucket...")
               file = stemcell_directory.files.create(key: file_name, body: File.open(image_path, 'r'))
@@ -381,6 +390,17 @@ module Bosh::Google
         server.attached_disks.map { |disk| disk.identity.to_s }
       end
     end
+
+  private
+
+    def run_command(command)
+      output, status = Open3.capture2e(command)
+      if status.exitstatus != 0
+        $stderr.puts output
+        err "'#{command}' failed with exit status=#{status.exitstatus} [#{output}]"
+      end
+    end
+
 
   end
 end
