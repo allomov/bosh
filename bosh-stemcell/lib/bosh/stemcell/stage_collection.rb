@@ -188,6 +188,7 @@ module Bosh::Stemcell
         :system_openstack_clock,
         :system_openstack_modules,
         :system_parameters,
+        :system_gce_packages,
         # Finalisation,
         :bosh_clean,
         :bosh_harden,
