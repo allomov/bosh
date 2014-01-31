@@ -121,8 +121,8 @@ module Bosh::Deployer
 
       def discover_bosh_ip
         if exists?
-          floating_ip = cloud.compute.servers.get(state.vm_cid).floating_ip_address
-          ip = floating_ip || service_ip
+          external_ip = cloud.compute.servers.get(state.vm_cid).external_ip
+          ip = external_ip || service_ip
 
           if ip != Config.bosh_ip
             Config.bosh_ip = ip

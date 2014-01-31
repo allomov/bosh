@@ -44,7 +44,7 @@ describe Bosh::Google::Cloud do
   end
 
   # download stemcell and place it in ./tmp/stemcells folder 
-  let(:stemcell_path) { ENV['BOSH_GOOGLE_STEMCELL_PATH'] || './tmp/stemcell.tar.gz' }
+  let(:stemcell_path) { ENV['BOSH_GOOGLE_STEMCELL_PATH'] || './tmp/disk.raw' }
 
   describe "Image upload based flow" do
 

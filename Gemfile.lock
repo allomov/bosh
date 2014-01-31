@@ -310,7 +310,7 @@ GEM
       thor (>= 0.16.0)
     json (1.7.7)
     json_pure (1.8.0)
-    jwt (0.1.10)
+    jwt (0.1.11)
       multi_json (>= 1.5)
     launchy (2.4.2)
       addressable (~> 2.3)

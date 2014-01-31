@@ -1,3 +1,5 @@
+require 'open3'
+
 module Bosh::Google
 
   class Cloud < Bosh::Cloud
@@ -85,6 +87,7 @@ module Bosh::Google
     # @return [String] opaque id later used by {#create_vm} and {#delete_stemcell}
     #
     # I assume here that image_path contains path to the file
+
     def create_stemcell(image_path, _ = nil)
       @logger.info("Creating stemcell from #{image_path}...")
       # TODO: maybe we don't need to generate new image every time ? maybe we can check check sum
@@ -100,31 +103,42 @@ module Bosh::Google
           # stemcell_directory = @storage.directories.find { |d| d.key == 'myveryownbucket_huehuehuehue' }
           # stemcell_directory = 'bosh-stemcell-1'
 
-          image_name = generate_stemcell_image_name(from: image_path)
-
           file = nil
           remote do
-            file_name = File.basename(image_path)
+            image_file_name = File.basename(image_path)
             image_directory = File.dirname(image_path)
-            if file_name == 'disk.raw'
+
+            if image_file_name == 'disk.raw'
               @logger.info("Packing disk.raw file to tar.gz archive")
-              file_name = 'stemcell.tar.gz'
-              archive_path = File.join(image_directory, file_name)
-              run_command("tar -cvzf #{archive_path} #{image_path}")
+              archive_file_name = 'disk.raw.tar.gz'
+              archive_path = File.join(image_directory, archive_file_name)
+              run_command("tar -cvzSf #{archive_path} --directory=#{image_directory} #{image_file_name}")
+              # run_command("tar -cvzSf #{archive_path} #{image_path}")
               stemcell_path = archive_path
+              # debugger
+
             end
-            file = stemcell_directory.files.find { |f| f.key == file_name }
+
+            file = stemcell_directory.files.find { |f| f.key == archive_file_name }
+
+            # debugger
 
             if file.nil?
-              @logger.info("Uploading image file #{file_name} into Google Storage to #{stemcell_directory.key} bucket...")
-              file = stemcell_directory.files.create(key: file_name, body: File.open(image_path, 'r'))
+              # debugger
+              @logger.info("Uploading archive #{archive_file_name} with image file #{image_file_name} into Google Storage to #{stemcell_directory.key} bucket...")
+              file = stemcell_directory.files.create(key: archive_file_name, body: File.open(archive_path, 'r'))
+              # debugger
               file.add_acl('AllUsers', 'READ')
             else 
-              @logger.warn("File #{file_name} already exists.")
+              @logger.warn("File #{archive_file_name} already exists in the Google Storage.")
             end
           end
   
           image = nil
+  
+          image_name = generate_stemcell_image_name(from: image_path)
+
+
           remote do
             @logger.info('Create new image..')
             puts('Create new image..')
@@ -204,7 +218,8 @@ module Bosh::Google
           server = @compute.servers.bootstrap( name: server_name,
                                                source_image: image.name,
                                                zone_name: zone_name,
-                                               machine_type: machine_type)
+                                               machine_type: machine_type, 
+                                               username: 'vcap')
 
           # is id a name or an id ????
           # server.id.to_s
@@ -394,6 +409,7 @@ module Bosh::Google
   private
 
     def run_command(command)
+      # debugger
       output, status = Open3.capture2e(command)
       if status.exitstatus != 0
         $stderr.puts output

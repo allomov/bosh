@@ -1,4 +1,3 @@
-
 # TODO: remove after fog is updated 
 require 'mime/types'
 

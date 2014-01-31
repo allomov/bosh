@@ -31,4 +31,5 @@ Gem::Specification.new do |s|
 
   # remove after updating fog version upper to 1.18
   s.add_dependency 'mime-types', '>=0.8.2'
+
 end
