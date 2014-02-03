@@ -48,7 +48,7 @@ module Bosh::Registry
             @openstack = nil
             retry
           end
-          raise ConnectionError, "Unable to connect to OpenStack API: #{e.message}"
+          raise ConnectionError, "Unable to connect to Google API: #{e.message}"
         end
         raise InstanceNotFound, "Instance `#{instance_id}' not found" unless instance
         return [instance.public_ip_address]

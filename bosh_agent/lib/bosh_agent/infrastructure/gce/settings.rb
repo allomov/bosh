@@ -25,7 +25,7 @@ module Bosh::Agent
     # @return [Hash] Agent Settings
     def load_settings
       setup_openssh_key
-      Infrastructure::Openstack::Registry.get_settings
+      Infrastructure::Gce::Registry.get_settings
     end
 
     ##
@@ -41,7 +41,7 @@ module Bosh::Agent
     #
     # @return [void]
     def setup_openssh_key
-      public_key = Infrastructure::Openstack::Registry.get_openssh_key
+      public_key = Infrastructure::Gce::Registry.get_openssh_key
       return if public_key.nil? || public_key.empty?
 
       FileUtils.mkdir_p(File.dirname(authorized_keys))

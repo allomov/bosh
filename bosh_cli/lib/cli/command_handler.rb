@@ -53,12 +53,12 @@ module Bosh::Cli
 
       args = parse_options(args)
 
-      begin
+      # begin
         command.send(@method.name, *args)
         command.exit_code
-      rescue ArgumentError => e
-        err("Usage: #{usage_with_params}")
-      end
+      # rescue ArgumentError => e
+      #   err("Usage: #{usage_with_params}")
+      # end
     end
 
     def usage_with_params

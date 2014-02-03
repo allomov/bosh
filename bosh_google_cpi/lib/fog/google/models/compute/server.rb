@@ -10,8 +10,6 @@ module Fog
         identity :name
 
         attribute :network_interfaces, :aliases => 'networkInterfaces'
-        attribute :network, :aliases => 'network'
-        attribute :external_ip, :aliases => 'externalIP'
         attribute :state, :aliases => 'status'
         attribute :zone_name, :aliases => 'zone'
         attribute :machine_type, :aliases => 'machineType'
@@ -47,7 +45,7 @@ module Fog
         end
 
         def flavor_id=(flavor_id)
-          machine_type=flavor_id
+          machine_type = flavor_id
         end
 
         def destroy
@@ -137,8 +135,6 @@ module Fog
           options = {
               'machineType' => machine_type,
               'networkInterfaces' => network_interfaces,
-              'network' => network,
-              'externalIp' => external_ip,
               'disks' => disks,
               'metadata' => metadata,
               'tags' => tags
@@ -203,13 +199,20 @@ module Fog
           requires :disks
           @attached_disks ||= self.disks.map do |disk|
             # we can work without parsing, but not now
-            puts "disk >> " + disk.inspect
             _, __, zone, name = disk['source'].match(/^https\:\/\/www\.googleapis\.com\/compute\/v1\/projects\/(.+)\/zones\/(.+)\/disks\/(.+)$/).to_a
             response = service.get_disk(name, zone)
             service.disks.new(response.body)
           end
         end
 
+        # def external_ip
+        #   requires :network_interfaces
+        #   raise "Strange, but #{self.inspect} should have network_interfaces." if self.network_interfaces.empty?
+        #   network_config = self.network_interfaces.find do |network| 
+        #     network['accessConfigs'].find { |config| config['type'] == 'ONE_TO_ONE_NAT' }
+        #   end
+        #   network_config.nil? ? nil : network_config['natIP']
+        # end
 
       end
     end

@@ -120,8 +120,10 @@ module Bosh::Deployer
       end
 
       def discover_bosh_ip
-        if exists?
-          external_ip = cloud.compute.servers.get(state.vm_cid).external_ip
+        if exists? # state.vm_cid not nil ??
+          external_ip = cloud.compute.servers.get(state.vm_cid).public_ip_address
+          puts external_ip.to_s
+          
           ip = external_ip || service_ip
 
           if ip != Config.bosh_ip

@@ -138,7 +138,6 @@ module Bosh::Google
   
           image_name = generate_stemcell_image_name(from: image_path)
 
-
           remote do
             @logger.info('Create new image..')
             puts('Create new image..')
@@ -206,23 +205,30 @@ module Bosh::Google
     # @return [String] opaque id later used by {#configure_networks}, {#attach_disk},
     #                  {#detach_disk}, and {#delete_vm}
     def create_vm(agent_id, stemcell_id, resource_pool,
-                  networks = nil, disk_locality = nil, env = nil)
+                  networks = nil, disk_locality = nil, environment = nil)
+      
+      region = resource_pool["zone_name"] || 'us-central1-a'
+
       with_thread_name("create_vm(#{agent_id}, ...)") do
         @logger.info("Creating new server...")
         remote do
 
+          logger.info("Creating new instance '#{[agent_id, stemcell_id, resource_pool,
+                            networks = nil, disk_locality = nil, environment = nil].inspect}'")
+          
           server_name  = "vm-#{generate_timestamp}"
           image        = remote { @compute.images.find  { |f| f.identity == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
-          zone_name    =  resource_pool["zone_name"] || 'us-central1-b'
+          zone_name    = region
           server = @compute.servers.bootstrap( name: server_name,
                                                source_image: image.name,
                                                zone_name: zone_name,
-                                               machine_type: machine_type, 
+                                               machine_type: machine_type,
                                                username: 'vcap')
 
-          # is id a name or an id ????
-          # server.id.to_s
+          registry_settings = agent_settings(agent_id, server_name, environment)
+          registry.update_settings(server.identity.to_s, registry_settings)
+          @logger.info("Registry was updated with parameters #{[server.identity.to_s, registry_settings].inspect}...")
           @logger.info("Server is created with #{server.identity.to_s} id...")
           server.identity.to_s
         end

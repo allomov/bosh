@@ -4,7 +4,7 @@ module Bosh::Google
 
     include Bosh::Google::CommonHelpers
 
-    %w(validate_options initialize_registry).each do |m|
+    %w(validate_options).each do |m|
       define_method m do 
         puts "TODO: Implement Helpers##{m} method."
       end
@@ -118,20 +118,34 @@ module Bosh::Google
   #   end
 
 
-  #   ##
-  #   # Inits registry
-  #   #
-  #   def initialize_registry
-  #     # TODO: see if here are surprises.
-  #     registry_properties = @options.fetch('registry')
-  #     registry_endpoint   = registry_properties.fetch('endpoint')
-  #     registry_user       = registry_properties.fetch('user')
-  #     registry_password   = registry_properties.fetch('password')
+    ##
+    # Inits registry
+    #
+    def initialize_registry
+      registry_properties = @options.fetch('registry')
+      registry_endpoint   = registry_properties.fetch('endpoint')
+      registry_user       = registry_properties.fetch('user')
+      registry_password   = registry_properties.fetch('password')
 
-  #     @registry = Bosh::Registry::Client.new(registry_endpoint,
-  #                                            registry_user,
-  #                                            registry_password)
-  #   end    
+      puts "initialize_registry with #{[registry_endpoint, registry_user, registry_password].inspect}."
+      @registry = Bosh::Registry::Client.new(registry_endpoint, registry_user, registry_password)
+    end
+
+    # ??? do we need root_device_name 
+    def agent_settings(agent_id, vm_name, environment, root_device_name = nil)
+      settings = {
+        "vm" => { "name" => vm_name },
+        "agent_id" => agent_id, 
+        "env" => environment
+      }
+      settings.merge(agent_properties)
+    end
+
+    def agent_properties
+      @agent_properties ||= options.fetch('agent', {})
+    end
+
+
 
     def find_by_identity(collection, identity)
       collection.find { |server| server.identity == identity }

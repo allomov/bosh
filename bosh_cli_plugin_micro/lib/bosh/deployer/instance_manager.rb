@@ -241,6 +241,13 @@ module Bosh::Deployer
       resources = Config.resources['cloud_properties']
       networks = Config.networks
       env = Config.env
+
+      puts "Bosh::Deployer::InstanceManager#create_vm(#{stemcell_cid})"
+
+      puts "resources: #{resources.inspect}"
+      puts "networks: #{networks.inspect}"
+      puts "env: #{env.inspect}"
+
       cloud.create_vm(state.uuid, stemcell_cid, resources, networks, nil, env)
     end
 
