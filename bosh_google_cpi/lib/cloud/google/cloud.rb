@@ -23,6 +23,7 @@ module Bosh::Google
       @options = options.dup
       @logger  = Bosh::Clouds::Config.logger
 
+      puts "initialize with #{@options.inspect}"
 
       validate_options
       initialize_registry
@@ -96,13 +97,6 @@ module Bosh::Google
         begin
           @logger.info("Creating new image...")
 
-          # stemcell_directory
-          # stemcell_directory = @storage.directories.find { |d| d.key == stemcell_directory_name }
-
-          # stemcell_directory = @storage.directories.find { |d| d.key == 'bosh-stemcell-1' }
-          # stemcell_directory = @storage.directories.find { |d| d.key == 'myveryownbucket_huehuehuehue' }
-          # stemcell_directory = 'bosh-stemcell-1'
-
           file = nil
           remote do
             image_file_name = File.basename(image_path)
@@ -113,21 +107,14 @@ module Bosh::Google
               archive_file_name = 'disk.raw.tar.gz'
               archive_path = File.join(image_directory, archive_file_name)
               run_command("tar -cvzSf #{archive_path} --directory=#{image_directory} #{image_file_name}")
-              # run_command("tar -cvzSf #{archive_path} #{image_path}")
               stemcell_path = archive_path
-              # debugger
-
             end
 
             file = stemcell_directory.files.find { |f| f.key == archive_file_name }
 
-            # debugger
-
             if file.nil?
-              # debugger
               @logger.info("Uploading archive #{archive_file_name} with image file #{image_file_name} into Google Storage to #{stemcell_directory.key} bucket...")
               file = stemcell_directory.files.create(key: archive_file_name, body: File.open(archive_path, 'r'))
-              # debugger
               file.add_acl('AllUsers', 'READ')
             else 
               @logger.warn("File #{archive_file_name} already exists in the Google Storage.")
@@ -215,15 +202,22 @@ module Bosh::Google
 
           logger.info("Creating new instance '#{[agent_id, stemcell_id, resource_pool, networks, disk_locality, environment].inspect}'")
 
+
           server_name  = "vm-#{generate_timestamp}"
           image        = remote { @compute.images.find  { |f| f.identity == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
           zone_name    = region
+          
+          
+          metadata = {'server' => {'name' => server_name}, 'registry' => @options['registry']}
+          puts "metadata : #{metadata.inspect}"
+
           server = @compute.servers.bootstrap( name: server_name,
                                                source_image: image.name,
                                                zone_name: zone_name,
                                                machine_type: machine_type,
-                                               username: 'vcap')
+                                               username: 'vcap', 
+                                               metadata: metadata)
 
           registry_settings = agent_settings(agent_id, server_name, environment)
           registry.update_settings(server.identity.to_s, registry_settings)

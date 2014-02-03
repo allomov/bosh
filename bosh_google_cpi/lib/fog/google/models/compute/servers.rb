@@ -74,7 +74,8 @@ module Fog
             :zone_name => zone,
             :private_key_path => File.expand_path("~/.ssh/gce_id_rsa"),
             :public_key_path => File.expand_path("~/.ssh/gce_id_rsa.pub"),
-            :username => ENV['USER'],
+            :metadata => {},
+            :username => ENV['USER']
           }
 
           server = new(defaults.merge(new_attributes))
