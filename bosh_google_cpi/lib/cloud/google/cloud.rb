@@ -213,9 +213,8 @@ module Bosh::Google
         @logger.info("Creating new server...")
         remote do
 
-          logger.info("Creating new instance '#{[agent_id, stemcell_id, resource_pool,
-                            networks = nil, disk_locality = nil, environment = nil].inspect}'")
-          
+          logger.info("Creating new instance '#{[agent_id, stemcell_id, resource_pool, networks, disk_locality, environment].inspect}'")
+
           server_name  = "vm-#{generate_timestamp}"
           image        = remote { @compute.images.find  { |f| f.identity == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
