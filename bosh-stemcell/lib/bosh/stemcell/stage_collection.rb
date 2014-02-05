@@ -63,7 +63,6 @@ module Bosh::Stemcell
           end
         when Infrastructure::Gce then
           gce_stages
-        end
       end
     end
 
