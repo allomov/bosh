@@ -109,10 +109,10 @@ PATH
 PATH
   remote: bosh_agent
   specs:
-    bosh_agent (1.1798.0)
-      blobstore_client (~> 1.1798.0)
-      bosh-core (~> 1.1798.0)
-      bosh_common (~> 1.1798.0)
+    bosh_agent (1.local.0)
+      blobstore_client (~> 1.local.0)
+      bosh-core (~> 1.local.0)
+      bosh_common (~> 1.local.0)
       crack (~> 0.3.2)
       httpclient (= 2.2.4)
       nats (~> 0.4.28)
