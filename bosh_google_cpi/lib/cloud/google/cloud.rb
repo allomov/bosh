@@ -1,4 +1,5 @@
 require 'open3'
+require 'json'
 
 module Bosh::Google
 
@@ -209,15 +210,16 @@ module Bosh::Google
           zone_name    = region
           
           
-          metadata = {'server' => {'name' => server_name}, 'registry' => @options['registry']}
-          puts "metadata : #{metadata.inspect}"
+          metadata_json = {'server' => {'name' => server_name}, 'registry' => @options['registry']}.to_json
+
+          puts "metadata : #{metadata_json.inspect}"
 
           server = @compute.servers.bootstrap( name: server_name,
                                                source_image: image.name,
                                                zone_name: zone_name,
                                                machine_type: machine_type,
                                                username: 'vcap', 
-                                               metadata: metadata)
+                                               metadata: { 'bosh-metadata' => metadata_json })
 
           registry_settings = agent_settings(agent_id, server_name, environment)
           registry.update_settings(server.identity.to_s, registry_settings)

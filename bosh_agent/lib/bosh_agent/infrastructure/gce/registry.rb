@@ -22,7 +22,7 @@ module Bosh::Agent
       #
       # @return [String] OpenSSH key
       def get_openssh_key
-        get_uri(META_DATA_URI + "/project/attributes/sshKeys")
+        get_metadata_for("sshKeys")
       rescue LoadSettingsError => e
         logger.info("Failed to get OpenSSH public key from GCE meta data endpoint: #{e.message}")
         user_data = parse_user_data(get_user_data_from_file)
@@ -147,14 +147,19 @@ module Bosh::Agent
       # @return [Hash] GCE user data
       def get_user_data
         return @user_data if @user_data
-        begin
-          raw_user_data = get_uri(META_DATA_URI + "/instance/attributes/?recursive=true")
-        rescue LoadSettingsError => e
-          logger.info("Failed to get user data from GCE user data endpoint: #{e.message}")
-        end
-
-        logger.info("GCE user data: #{raw_user_data.inspect}")
+        user_data_json = get_metadata_for('bosh-metadata')
+        user_data = parse_user_data(user_data_json)
+        logger.info("GCE user data: #{user_data.inspect}")
         @user_data = parse_user_data(raw_user_data)
+      end
+
+      def get_metadata_for(key)
+        begin
+          get_uri(META_DATA_URI + "/instance/attributes/#{key}")
+        rescue LoadSettingsError => e
+          logger.info("Failed to get user data for key '#{key}' from GCE metadata endpoint: #{META_DATA_URI + "/instance/attributes/#{key}"}")
+          raise e
+        end
       end
 
       ##
@@ -165,15 +170,13 @@ module Bosh::Agent
       def parse_user_data(raw_user_data)
         begin
           user_data = Yajl::Parser.parse(raw_user_data)
+          unless user_data.is_a?(Hash) || user_data.is_a?(Array)
+            raise LoadSettingsError, "Invalid user data format, Hash expected, got #{user_data.class}: #{user_data}"
+          end
+          user_data
         rescue Yajl::ParseError => e
           raise LoadSettingsError, "Cannot parse user data #{raw_user_data.inspect}: #{e.message}"
         end
-
-        unless user_data.is_a?(Hash)
-          raise LoadSettingsError, "Invalid user data format, Hash expected, got #{user_data.class}: #{user_data}"
-        end
-
-        user_data
       end
 
       ##
