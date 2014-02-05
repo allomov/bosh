@@ -23,13 +23,13 @@ module Bosh::Agent
       # @return [String] OpenSSH key
       def get_openssh_key
         get_metadata_for("sshKeys")
-      rescue LoadSettingsError => e
-        logger.info("Failed to get OpenSSH public key from GCE meta data endpoint: #{e.message}")
-        user_data = parse_user_data(get_user_data_from_file)
-        unless user_data.has_key?("openssh") && user_data["openssh"].has_key?("public_key")
-          raise LoadSettingsError, "Cannot get OpenSSH public key from injected user data file: #{user_data.inspect}"
-        end
-        user_data["openssh"]["public_key"]
+        # rescue LoadSettingsError => e
+        #   logger.info("Failed to get OpenSSH public key from GCE meta data endpoint: #{e.message}")
+        #   # user_data = parse_user_data(get_user_data_from_file)
+        #   unless user_data.has_key?("openssh") && user_data["openssh"].has_key?("public_key")
+        #     raise LoadSettingsError, "Cannot get OpenSSH public key from injected user data file: #{user_data.inspect}"
+        #   end
+        #   # user_data["openssh"]["public_key"]
       end
 
       ##
