@@ -63,7 +63,6 @@ module Bosh::Stemcell
           end
         when Infrastructure::Gce then
           gce_stages
-        end
       end
     end
 
@@ -196,6 +195,7 @@ module Bosh::Stemcell
         :system_openstack_modules,
         :system_parameters,
         :system_gce_packages,
+        :system_gce_metadata,
         # Finalisation,
         :bosh_clean,
         :bosh_harden,

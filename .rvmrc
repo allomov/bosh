@@ -1,2 +1,2 @@
-rvm use --create 2.0@bosh
+rvm use --create 1.9.3@bosh
 

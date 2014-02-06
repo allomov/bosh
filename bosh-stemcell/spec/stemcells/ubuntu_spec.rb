@@ -1,5 +1,5 @@
 require 'spec_helper'
-require 'pry'
+
 describe 'Ubuntu Stemcell' do
 
   it_behaves_like 'a stemcell'
