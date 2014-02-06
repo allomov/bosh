@@ -223,6 +223,7 @@ module Bosh::Google
 
           registry_settings = agent_settings(agent_id, server_name, environment)
           registry.update_settings(server.identity.to_s, registry_settings)
+
           @logger.info("Registry was updated with parameters #{[server.identity.to_s, registry_settings].inspect}...")
           @logger.info("Server is created with #{server.identity.to_s} id...")
           server.identity.to_s
@@ -283,7 +284,12 @@ module Bosh::Google
       remote do
         @logger.info("Set VM with #{vm_id} id metadata #{metadata.inspect}...")
         server = find_server_by_identity(vm_id)
-        operation = server.set_metadata(metadata)
+        puts "Cloud#set_vm_metadata"
+        puts "server: #{server.inspect}"
+        updated_metadata = server.metadata.merge(metadata)
+        puts "updated_metadata: #{updated_metadata.inspect}"
+        operation = server.set_metadata(updated_metadata)
+        puts "operation: #{operation.inspect}"
         operation.wait_for { ready? }
       end
     end

@@ -145,8 +145,6 @@ module Bosh::Google
       @agent_properties ||= options.fetch('agent', {})
     end
 
-
-
     def find_by_identity(collection, identity)
       collection.find { |server| server.identity == identity }
     end

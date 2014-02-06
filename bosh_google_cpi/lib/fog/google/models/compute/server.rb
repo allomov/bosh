@@ -18,6 +18,24 @@ module Fog
         attribute :tags, :squash => 'items'
         attribute :self_link, :aliases => 'selfLink'
 
+        attr_accessor :metadata_fingerprint
+
+        alias_method "metadata setter", :metadata=
+        
+        def metadata=(metadata)
+          raise "Metadata should be a Hash." unless metadata.is_a?(Hash)
+
+          p [:metadata, metadata]
+
+          if @metadata_fingerprint = metadata['fingerprint']
+            metadata = metadata['items'].inject({}) { |h, v| h[v['key']] = v['value']; h }
+          elsif metadata.values.any? { |v| v.is_a?(Hash) }
+            raise "Metadata #{metadata.inspect} has hash values that are not accepted with Google Engine."
+          end
+
+          self.send("metadata setter", metadata)
+        end
+
         def image_name=(args)
           Fog::Logger.deprecation("image_name= is no longer used [light_black](#{caller.first})[/]")
         end
@@ -115,10 +133,6 @@ module Fog
           requires :zone_name
           requires :disks
 
-          if not service.zones.find{ |zone| zone.name == self.zone_name }
-            raise ArgumentError.new "#{self.zone_name.inspect} is either down or you don't have permission to use it."
-          end
-
           self.add_ssh_key(self.username, self.public_key) if self.public_key
 
           options = {
@@ -148,14 +162,14 @@ module Fog
         alias_method :reboot, :reset
 
 
-        def set_metadata(metadata = {})
+        def set_metadata(metadata = {}, options = {merge: true})
           requires :name, :zone_name
-          if !self.metadata.is_a?(Hash) || self.metadata['fingerprint'].nil? 
+          if @metadata_fingerprint.nil? 
             raise "Server metadata should be Hash and have 'fingerprint' key.\n" +
                   "'fingerprint' key is returned after get_server request.\n" + 
                   "You can't call set_metadata on new instances. Have a good day."
           end
-          response = service.set_metadata(name, zone_name, self.metadata['fingerprint'], metadata)
+          response = service.set_metadata(name, zone_name, @metadata_fingerprint, metadata)
           service.operations.new(response.body)
         end
 

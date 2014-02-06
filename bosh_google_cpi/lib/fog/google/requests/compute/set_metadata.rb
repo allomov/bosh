@@ -21,9 +21,14 @@ module Fog
             'fingerprint' => fingerprint,
             'items' => metadata.to_a.map { |pair| { :key => pair[0], :value => pair[1] } }
           }
-          
+
+          p [:set_metadata, body_object]
+          p [:set_metadata, parameters]
+
           result = self.build_result(api_method, parameters, body_object)
 
+          p [:set_metadata, result]
+          
           response = self.build_response(result)
         end
       end

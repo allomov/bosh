@@ -24,14 +24,16 @@ module Fog
           disks
         end
 
-        def insert_server(server_name, zone_name, options={}, *deprecated_args)
+        def insert_server(server_name, zone_name_or_url, options={}, *deprecated_args)
+
+          zone_name = get_zone_name(zone_name_or_url)
 
           url_prefix = "https://www.googleapis.com/compute/#{api_version}/projects/#{@project}"
           zone_url = "#{url_prefix}/zones/#{zone_name}"
           machine_type_url = "#{zone_url}/machineTypes/#{machine_type_name}"
 
           if options['disks'].nil? or options['disks'].empty?
-            raise ArgumentError.new "Empty value for field 'disks'. Boot disk must be specified"
+            raise ArgumentError.new "Empty value for field 'disks'. Boot disk must be specified."
           end
 
           id = Fog::Mock.random_numbers(19).to_s
@@ -39,7 +41,7 @@ module Fog
             "kind" => "compute#instance",
             "id" => id,
             "creationTimestamp" => Time.now.iso8601,
-            "zone" => zone_url,
+            "zone" => zone_name,
             "status" => "PROVISIONING",
             "name" => server_name,
             "tags" => { "fingerprint" => "42WmSpB8rSM=" },
@@ -118,7 +120,9 @@ module Fog
           { "items" => metadata.map {|k,v| {"key" => k, "value" => v}} }
         end
 
-        def insert_server(server_name, zone_name, options={}, *deprecated_args)
+        def insert_server(server_name, zone_name_or_url, options={}, *deprecated_args)
+          zone_name = get_zone_name(zone_name_or_url)
+
           if deprecated_args.length > 0 or not options.is_a? Hash
             raise ArgumentError.new 'Too many parameters specified. This may be the cause of code written for an outdated'\
                 ' version of fog. Usage: server_name, zone_name, [options]'
@@ -130,7 +134,10 @@ module Fog
           }
           body_object = {:name => server_name}
 
-          body_object['machineType'] = @api_url + @project + "/zones/#{zone_name}/machineTypes/#{options.delete('machineType')}"
+          machine_type_name_or_url = options.delete('machineType')
+          machine_type_name = get_machine_type_name(machine_type_name_or_url)
+
+          body_object['machineType'] = @api_url + @project + "/zones/#{zone_name}/machineTypes/#{machine_type_name}"
           network = nil
           if options.has_key? 'network'
             network = options.delete 'network'

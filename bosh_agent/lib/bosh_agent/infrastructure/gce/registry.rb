@@ -148,9 +148,8 @@ module Bosh::Agent
       def get_user_data
         return @user_data if @user_data
         user_data_json = get_metadata_for('bosh-metadata')
-        user_data = parse_user_data(user_data_json)
-        logger.info("GCE user data: #{user_data.inspect}")
-        @user_data = parse_user_data(raw_user_data)
+        logger.info("GCE user data: #{user_data_json.inspect}")
+        @user_data = parse_user_data(user_data_json)
       end
 
       def get_metadata_for(key)
