@@ -50,10 +50,20 @@ module Bosh::Deployer
 
     # rubocop:disable MethodLength
     def remote_tunnel(port)
+
+      p [:remote_tunnel, :port, port]
+
       @sessions ||= {}
+
+      p [:remote_tunnel, :sessions, @sessions]
+
       return if @sessions[port]
 
+
+
       ip = Config.bosh_ip
+
+      p [:remote_tunnel, "Config.bosh_ip", Config.bosh_ip]
 
       # sshd is up, sleep while host keys are generated
       loop until socket_readable?(ip, @ssh_port) { sleep(@ssh_wait) }
@@ -63,9 +73,11 @@ module Bosh::Deployer
         loop do
           begin
             @sessions[port] = Net::SSH.start(ip, @ssh_user, keys: [@ssh_key], paranoid: false)
+            p [:remote_tunnel, "ssh #{@ssh_user}@#{ip}: ESTABLISHED"]
             logger.debug("ssh #{@ssh_user}@#{ip}: ESTABLISHED")
             break
           rescue => e
+            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} failed: #{e.inspect}"]
             logger.debug("ssh start #{@ssh_user}@#{ip} failed: #{e.inspect}")
             sleep 1
           end
@@ -74,6 +86,9 @@ module Bosh::Deployer
 
       lo = '127.0.0.1'
       @sessions[port].forward.remote(port, lo, port)
+
+      p [:remote_tunnel, port, lo, port]
+      p [:remote_tunnel, "SSH forwarding for port #{port} started: OK"]
 
       logger.info("SSH forwarding for port #{port} started: OK")
 

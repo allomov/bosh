@@ -62,11 +62,25 @@ module Bosh::Deployer
       def start
         configure
 
+        p [:registry, :start, :@registry_config, @registry_config]
+
+        p [:registry, :start, :@registry_connection_settings, @registry_connection_settings]
+
         Sequel.connect(@registry_connection_settings) do |db|
           migrate(db)
+          
+          p [:registry, "@deployments['registry_instances']", @deployments['registry_instances']]
+
           instances = @deployments['registry_instances']
+
+          p [:registry, "db[:registry_instances]", db[:registry_instances]]
+
+          p [:registry, "instances", instances]
+
           db[:registry_instances].insert_multiple(instances) if instances
         end
+
+        p [:registry, "has_bosh_registry?", has_bosh_registry?]
 
         unless has_bosh_registry?
           err 'bosh-registry command not found - ' +
@@ -75,17 +89,28 @@ module Bosh::Deployer
 
         cmd = "bosh-registry -c #{@registry_config.path}"
 
+
+
         @registry_pid = spawn(cmd)
 
-        5.times do
+        p [:registry, :@registry_pid, @registry_pid]
+
+        5.times do |i|
           sleep 0.5
           if Process.waitpid(@registry_pid, Process::WNOHANG)
             err "`#{cmd}` failed, exit status=#{$?.exitstatus}"
+            p "AAAAAAAAAAAAAAAAaAAAAaaAA"
           end
+          p [:registry, i, "Process.waitpid(@registry_pid, Process::WNOHANG)"]
         end
+
 
         timeout_time = Time.now.to_f + (60 * 5)
         http_client = HTTPClient.new
+
+        p [:registry, :timeout_time, timeout_time]
+        p [:registry, :http_client, http_client]
+
         begin
           http_client.head("http://127.0.0.1:#{@registry_port}")
           sleep 0.5
@@ -94,12 +119,17 @@ module Bosh::Deployer
             retry
           else
             err "Cannot access bosh-registry: #{e.message}"
+            p "Cannot access bosh-registry: #{e.message}"
           end
         end
 
         logger.info("bosh-registry is ready on port #{@registry_port}")
+        
+        p [:registry, "bosh-registry is ready on port #{@registry_port}"]
+
       ensure
         @registry_config.unlink if @registry_config
+        p [:registry, "@registry_config unlinked", @registry_config]
       end
       # rubocop:enable MethodLength
 
@@ -164,6 +194,7 @@ module Bosh::Deployer
       end
 
       def migrate(db)
+        p [:migrate]
         db.create_table :registry_instances do
           primary_key :id
           column :instance_id, :text, unique: true, null: false
