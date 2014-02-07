@@ -115,7 +115,8 @@ module Fog
           self.metadata.default = ""
           # You can have multiple SSH keys, seperated by newlines.
           # https://developers.google.com/compute/docs/console?hl=en#sshkeys
-          self.metadata["sshKeys"] += "\n#{username}:#{key.strip}"
+          self.metadata["sshKeys"] += "\n" unless self.metadata["sshKeys"].empty?
+          self.metadata["sshKeys"] += "#{username}:#{key.strip}"
           return self.metadata
         end
 
