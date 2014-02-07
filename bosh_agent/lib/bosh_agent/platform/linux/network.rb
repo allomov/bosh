@@ -21,7 +21,7 @@ module Bosh::Agent
         when "openstack"
           setup_dhcp_from_settings
         when "gce", "google"
-          setup_dhcp_from_settings
+          # setup_dhcp_from_settings
         else
           raise Bosh::Agent::FatalError, "Setup networking failed, unsupported infrastructure #{Bosh::Agent::Config.infrastructure_name}"
       end
