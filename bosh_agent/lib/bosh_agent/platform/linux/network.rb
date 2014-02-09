@@ -21,6 +21,7 @@ module Bosh::Agent
         when "openstack"
           setup_dhcp_from_settings
         when "gce", "google"
+          # it seems that google doesn't need it.
           # setup_dhcp_from_settings
         else
           raise Bosh::Agent::FatalError, "Setup networking failed, unsupported infrastructure #{Bosh::Agent::Config.infrastructure_name}"

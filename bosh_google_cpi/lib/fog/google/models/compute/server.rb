@@ -184,14 +184,15 @@ module Fog
           end
         end
 
+        def device_name_for(disk)
+          disk_device_json = self.disks.find { |attached_disk| attached_disk['source'] == disk.self_link }
+          device_name = disk_device_json['deviceName']
+        end
+
         def detach(disk, options = {})
           requires :name, :zone_name
           if disk.is_a?(Disk)
-            puts self.disks.inspect
-            puts disk.inspect
-            puts disk.self_link
-            disk_device_to_detach = self.disks.find { |attached_disk| attached_disk['source'] == disk.self_link }
-            device_name = disk_device_to_detach['deviceName']
+            device_name = self.device_name_for(disk)
             response = service.detach_disk(self.name, zone_name, device_name)
             service.operations.new(response.body)
           else

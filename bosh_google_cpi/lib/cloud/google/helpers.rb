@@ -141,6 +141,30 @@ module Bosh::Google
       settings.merge(agent_properties)
     end
 
+    def update_agent_settings(options = {})
+      instace_id = options[:instance]
+      settings_path = options[:settings] || []
+
+      unless block_given?
+        raise ArgumentError, "block is not provided"
+      end
+
+      settings = registry.read_settings(instance.id)
+      
+      # create necessary deep hash structure inside settings 
+      # for instance for settings = {} and settings_path = %w(a1 a2)
+      # settings should be equeal settings = {'a1' => {'a2' => {}}}
+      hash ||= settings[settings_path.shift] ||= {}
+      settings_path.each { |key| hash = (hash[key] ||= {}); }
+
+      yield settings if block_given?
+
+      p [:update_agent_settings, settings]
+      registry.update_settings(instance.id, settings)
+
+
+    end    
+
     def agent_properties
       @agent_properties ||= options.fetch('agent', {})
     end

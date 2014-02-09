@@ -356,6 +356,7 @@ module Bosh::Deployer
         create_disk
         attach_disk(state.disk_cid, true)
       elsif persistent_disk_changed?
+        # ??? maybe some warning because disk will be recreated
         size = Config.resources['persistent_disk']
 
         # save a reference to the old disk

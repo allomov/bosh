@@ -302,7 +302,10 @@ module Bosh::Google
     #               same as the networks argument in {#create_vm}
     # @return [void]
     def configure_networks(vm_id, networks)
-      not_implemented(:configure_networks)
+      # not_implemented(:configure_networks)
+      # I don't think we need to do something here
+      p [:configure_networks, "!!!!", vm_id, networks]
+      update_agent_settings(instance: vm_id, settings: 'networks')
     end
 
     ##
@@ -351,6 +354,11 @@ module Bosh::Google
         disk   = find_by_identity(compute.disks, disk_id)
         operation = server.attach(disk)
         operation.wait_for { ready? }
+
+        update_agent_settings(instance: vm_id, settings: %w(disks persistent)) do |settings|
+          settings["disks"]["persistent"][disk_id] = server.device_name_for(disk)
+        end
+
       end
     end
 
@@ -367,6 +375,11 @@ module Bosh::Google
         disk = find_by_identity(compute.disks, disk_id)
         operation = server.detach(disk)
         operation.wait_for { ready? }
+
+        update_agent_settings(instance: vm_id, settings: %w(disks persistent)) do |settings|
+          settings["disks"]["persistent"].delete(disk_id)
+        end
+
       end
     end
 
