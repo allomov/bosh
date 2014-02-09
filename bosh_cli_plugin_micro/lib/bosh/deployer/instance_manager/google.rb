@@ -172,7 +172,7 @@ module Bosh::Deployer
       # @return [Integer] size in MiB
       def disk_size(cid)
         # Google stores disk size in GiB but we work with MiB
-        cloud.compute.volumes.get(cid).size * 1024
+        cloud.compute.disks.get(cid).size_gb * 1024
       end
 
       def persistent_disk_changed?
@@ -180,6 +180,7 @@ module Bosh::Deployer
         # is a risk of conversion errors which lead to an unnecessary
         # disk migration, so we need to do a double conversion
         # here to avoid that
+        # ??????
         requested = (Config.resources['persistent_disk'] / 1024.0).ceil * 1024
         requested != disk_size(state.disk_cid)
       end

@@ -40,6 +40,8 @@ module Bosh::Agent
             return nil
           end
           get_available_path(dev_path)
+        when 'google', 'gce'
+          # ????
         else
           raise Bosh::Agent::FatalError, "Lookup disk failed, unsupported infrastructure #{Bosh::Agent::Config.infrastructure_name}"
       end
