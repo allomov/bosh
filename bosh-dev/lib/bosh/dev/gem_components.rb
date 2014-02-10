@@ -37,6 +37,7 @@ module Bosh::Dev
        bosh_openstack_cpi
        bosh-registry
        bosh_vsphere_cpi
+       bosh_google_cpi
        bosh-director
        bosh-monitor
        bosh-release

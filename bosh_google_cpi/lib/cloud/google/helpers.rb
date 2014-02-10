@@ -132,24 +132,29 @@ module Bosh::Google
     end
 
     # ??? do we need root_device_name 
-    def agent_settings(agent_id, vm_name, environment, root_device_name = nil)
+    def agent_registry_settings(agent_id, vm_name, environment, system_disk_name, ephemeral_disk_name = nil)
       settings = {
         "vm" => { "name" => vm_name },
         "agent_id" => agent_id, 
-        "env" => environment
+        "env" => environment, 
+        "disks" => {
+          "system" => system_disk_name,
+          "ephemeral" => ephemeral_disk_name,
+          "persistent" => {}
+        }
       }
       settings.merge(agent_properties)
     end
 
     def update_agent_settings(options = {})
-      instace_id = options[:instance]
+      instance_id = options[:instance]
       settings_path = options[:settings] || []
 
       unless block_given?
         raise ArgumentError, "block is not provided"
       end
 
-      settings = registry.read_settings(instance.id)
+      settings = registry.read_settings(instance_id)
       
       # create necessary deep hash structure inside settings 
       # for instance for settings = {} and settings_path = %w(a1 a2)
@@ -160,7 +165,7 @@ module Bosh::Google
       yield settings if block_given?
 
       p [:update_agent_settings, settings]
-      registry.update_settings(instance.id, settings)
+      registry.update_settings(instance_id, settings)
 
 
     end    

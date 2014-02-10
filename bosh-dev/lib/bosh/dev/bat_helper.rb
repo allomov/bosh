@@ -23,7 +23,8 @@ module Bosh::Dev
     def self.runner_builder_for_infrastructure_name(name)
       { 'aws'       => Bosh::Dev::Aws::RunnerBuilder.new,
         'openstack' => Bosh::Dev::Openstack::RunnerBuilder.new,
-        'vsphere'   => Bosh::Dev::VSphere::RunnerBuilder.new,
+        'vsphere'   => Bosh::Dev::VSphere::RunnerBuilder.new
+        # 'google'    => Bosh::Dev::Google::RunnerBuilder.new,
       }[name]
     end
 

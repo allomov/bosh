@@ -64,11 +64,13 @@ module Fog
 
       class Real
 
-        def insert_disk(disk_name, zone_name, image_name=nil, opts={})
+        def insert_disk(disk_name, zone_name_or_url, image_name=nil, opts={})
+          zone_name = get_zone_name(zone_name_or_url)
           api_method = @compute.disks.insert
+
           parameters = {
             'project' => @project,
-            'zone' => zone_name
+            'zone'    => zone_name
           }
 
           if image_name

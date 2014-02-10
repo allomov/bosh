@@ -185,6 +185,8 @@ module Fog
         end
 
         def device_name_for(disk)
+          requires :disks
+          p [:device_name_for, "self.disks", self.disks]
           disk_device_json = self.disks.find { |attached_disk| attached_disk['source'] == disk.self_link }
           device_name = disk_device_json['deviceName']
         end

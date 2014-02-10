@@ -195,7 +195,7 @@ module Bosh::Google
     def create_vm(agent_id, stemcell_id, resource_pool,
                   networks = nil, disk_locality = nil, environment = nil)
       
-      region = resource_pool["zone_name"] || 'us-central1-a'
+      @zone_name = region = resource_pool["zone_name"] || 'us-central1-a'
 
       with_thread_name("create_vm(#{agent_id}, ...)") do
         @logger.info("Creating new server...")
@@ -204,7 +204,7 @@ module Bosh::Google
           logger.info("Creating new instance '#{[agent_id, stemcell_id, resource_pool, networks, disk_locality, environment].inspect}'")
 
 
-          server_name  = "vm-#{generate_timestamp}"
+          server_name  = "vm#{generate_timestamp}"
           image        = remote { @compute.images.find  { |f| f.identity == stemcell_id } }
           machine_type = resource_pool["machine_type"] || resource_pool["instance_type"] || 'g1-small'
           zone_name    = region
@@ -221,7 +221,22 @@ module Bosh::Google
                                                username: 'vcap', 
                                                metadata: { 'bosh-metadata' => metadata_json })
 
-          registry_settings = agent_settings(agent_id, server_name, environment)
+          ephemeral_disk_size = resource_pool["zone_name"] || 10 * 1024
+          ephemeral_disk = compute.disks.create(name: "ephemeral-disk-of-#{server.name}",
+                                                size_gb: (ephemeral_disk_size.to_i / 1024.0).ceil, 
+                                                zone_name: zone_name)
+
+          server.attach(ephemeral_disk)
+          server.reload
+
+          p [:create_vm, :server, server]
+
+          registry_settings = agent_registry_settings(agent_id,
+                                                      server_name, 
+                                                      environment, 
+                                                      server.disks.first['deviceName'], 
+                                                      server.disks.last['deviceName'])
+
           registry.update_settings(server.identity.to_s, registry_settings)
 
           @logger.info("Registry was updated with parameters #{[server.identity.to_s, registry_settings].inspect}...")
@@ -317,10 +332,12 @@ module Bosh::Google
     # @param [optional, String] vm_locality vm id if known of the VM that this disk will
     #                           be attached to
     # @return [String] opaque id later used by {#attach_disk}, {#detach_disk}, and {#delete_disk}
-    def create_disk(size, vm_locality = nil)
+    def create_disk(size, vm_id = nil)
       remote do
         @logger.info("Creating disk...")
-        disk = compute.disks.new(name: "bosh-disk-#{generate_timestamp}", zone_name: 'us-central1-b', size_gb: (size / 1024).to_i)
+        server = find_server_by_identity(vm_id)
+        zone_name = server.nil? ? 'us-central1-a' : server.zone_name
+        disk = compute.disks.new(name: "bosh-disk-#{generate_timestamp}", zone_name: zone_name, size_gb: (size / 1024).to_i)
         disk.save
         disk.identity.to_s
       end
@@ -354,7 +371,7 @@ module Bosh::Google
         disk   = find_by_identity(compute.disks, disk_id)
         operation = server.attach(disk)
         operation.wait_for { ready? }
-
+        server.reload
         update_agent_settings(instance: vm_id, settings: %w(disks persistent)) do |settings|
           settings["disks"]["persistent"][disk_id] = server.device_name_for(disk)
         end
