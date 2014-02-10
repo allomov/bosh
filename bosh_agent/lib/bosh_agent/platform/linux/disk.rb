@@ -41,14 +41,8 @@ module Bosh::Agent
           end
           get_available_path(dev_path)
         when 'google', 'gce'
-          persistent_data_disk_name = settings['disks']['persistent']['name']
-          if persistent_data_disk_name
-            device_path_symlink = "/dev/disk/by-id/google-#{persistent_data_disk_name}"
-            device_path = File.readlink(device_path_symlink)
-            
-          else
-            raise Bosh::Agent::FatalError, "Agent can't find data disk #{persistent_data_disk_name}."
-          end
+          persistent_data_disk_name = settings['disks']['persistent'].values.first
+          get_available_google_logic_disk_path(persistent_data_disk_name)
         else
           raise Bosh::Agent::FatalError, "Lookup disk failed, unsupported infrastructure #{Bosh::Agent::Config.infrastructure_name}"
       end
@@ -69,7 +63,11 @@ module Bosh::Agent
           # AWS & OpenStack pass in the device name
           get_available_path(disk_id)
         when 'google', 'gce'
-
+          # !!!!???
+          p [:lookup_disk_by_cid, :cid, cid]
+          p [:lookup_disk_by_cid, :settings, settings]
+          persistent_data_disk_name = settings['disks']['persistent'].values.first
+          get_available_google_logic_disk_path(persistent_data_disk_name)          
         else
           raise Bosh::Agent::FatalError, "Lookup disk failed, unsupported infrastructure #{Bosh::Agent::Config.infrastructure_name}"
       end
@@ -111,6 +109,15 @@ module Bosh::Agent
       end
       Dir.glob(dev_paths).last
     end
+
+    def get_available_google_logic_disk_path(device_name)
+      if persistent_data_disk_name
+        device_path_symlink = "/dev/disk/by-id/google-#{persistent_data_disk_name}"
+        device_path = File.readlink(device_path_symlink)
+      else
+        raise Bosh::Agent::FatalError, "Agent can't find data disk #{persistent_data_disk_name}."
+      end
+    end    
 
     def get_available_scsi_path(disk_id)
       rescan_scsi_bus

@@ -109,7 +109,6 @@ module Bosh::Deployer
         http_client = HTTPClient.new
 
         p [:registry, :timeout_time, timeout_time]
-        p [:registry, :http_client, http_client]
 
         begin
           http_client.head("http://127.0.0.1:#{@registry_port}")
