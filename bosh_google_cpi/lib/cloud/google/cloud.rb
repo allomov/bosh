@@ -226,7 +226,9 @@ module Bosh::Google
                                                 size_gb: (ephemeral_disk_size.to_i / 1024.0).ceil, 
                                                 zone_name: zone_name)
 
-          server.attach(ephemeral_disk)
+          attach_operation = server.attach(ephemeral_disk)
+          attach_operation.wait_for { ready? }
+          
           server.reload
 
           p [:create_vm, :server, server]

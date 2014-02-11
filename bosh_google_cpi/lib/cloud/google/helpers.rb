@@ -138,7 +138,7 @@ module Bosh::Google
         "agent_id" => agent_id, 
         "env" => environment, 
         "disks" => {
-          "system" => system_disk_name,
+          "system"    => system_disk_name,
           "ephemeral" => ephemeral_disk_name,
           "persistent" => {}
         }

@@ -66,7 +66,9 @@ module Bosh::Agent
 
       def partition_disk(dev, sfdisk_input)
         if File.blockdev?(dev)
+          logger.info [:partition_disk, dev, sfdisk_input].inspect
           sfdisk_cmd = "echo \"#{sfdisk_input}\" | sfdisk -uM #{dev}"
+          logger.info("Executing #{sfdisk_cmd}")
           output = %x[#{sfdisk_cmd}]
           unless $? == 0
             logger.info("failed to parition #{dev}")
