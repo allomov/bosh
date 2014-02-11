@@ -28,6 +28,7 @@ module Bosh::Common
     # @param [String] name Dot-separated property name
     def lookup_property(collection, name)
       keys = name.split(".")
+
       ref = collection
 
       keys.each do |key|

@@ -260,6 +260,28 @@ cloud:
           vm_metadata_key: <%= vm_metadata_key %>
           description: <%= description %>
 <% end %>
+
+
+
+<% if_p('google.compute.client_email', 'google.compute.project', 
+        'google.compute.key_location',
+        'google.storage.access_key', 'google.storage.secret') do |client_email, project, 
+                                                                  key_location,
+                                                                  storage_access_key, storage_secret| %>
+                                                                  
+  plugin: google <% plugin = "google" %>
+  properties:
+    compute:
+      client_email: <%= client_email %>
+      project: <%= project %>
+      key_location: <%= key_location %>
+    storage:
+      access_key: <%= storage_access_key %>
+      secret: <%= storage_secret %>
+
+<% end %>
+
+
 <% raise "Could not find cloud plugin" if plugin.nil? %>
     agent:
       ntp: [<%= p('ntp').join(", ") %>]
