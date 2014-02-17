@@ -21,6 +21,12 @@ namespace :release do
     end
   end
 
+
+  desc 'Create and upload BOSH dev release through scp.'
+  task :force_upload_dev_release => :create_dev_release do |_, args|
+    
+  end
+
   def create_release(options={})
     name = options[:name] || "bosh"
     final = options[:final] || false
@@ -29,7 +35,7 @@ namespace :release do
         sh('bosh create release --final')
       else
         File.open('config/dev.yml', 'w+') { |f| f.write("---\ndev_name: #{name}\n") }
-        sh('bosh create release --force')
+        sh('bosh create release --force --with-tarball')
       end
     end
   end

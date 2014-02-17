@@ -144,7 +144,9 @@ module Bosh::Deployer
         end
       end
 
-      apply
+      # require 'debugger'
+      # debugger
+      STDIN.getc
 
       step 'Waiting for the director' do
         begin
