@@ -59,8 +59,6 @@ module Bosh::Deployer
 
       return if @sessions[port]
 
-
-
       ip = Config.bosh_ip
 
       p [:remote_tunnel, "Config.bosh_ip", Config.bosh_ip]

@@ -312,3 +312,16 @@ properties:
   vcd.entities.description:
     description: TODO
     default: vcd-cf
+
+  # Google
+  google.compute.client_email:
+    description: TODO
+  google.compute.project:
+    description: TODO
+  google.compute.key:
+    description: TODO
+
+  google.storage.access_key:
+    description: TODO
+  google.storage.secret:
+    description: TODO

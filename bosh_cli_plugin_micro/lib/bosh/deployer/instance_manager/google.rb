@@ -17,10 +17,12 @@ module Bosh::Deployer
       # rubocop:disable MethodLength
       def configure
         properties = Config.cloud_options['properties']
+
+
         @ssh_user = properties['google']['ssh_user']
         @ssh_port = properties['google']['ssh_port'] || 22
         @ssh_wait = properties['google']['ssh_wait'] || 60
-
+        
         key = properties['google']['private_key']
         err 'Missing properties.google.private_key' unless key
         @ssh_key = File.expand_path(key)
@@ -28,14 +30,25 @@ module Bosh::Deployer
           err "properties.google.private_key '#{key}' does not exist"
         end
 
+        # load_keys(properties, 'google.comppute.key_location')
+        compute_key_location = properties['google']['compute']['key_location']
+        if File.exists?(compute_key_location)
+          properties['google']['compute'].merge!('key' => File.read(compute_key_location))
+        else
+          raise "properties.google.compute.key_location '#{compute_key_location}' does not exist."
+        end
+
+        p [:google, :configure, properties['google']['compute']]
+        
+
         uri = URI.parse(properties['registry']['endpoint'])
         user, password = uri.userinfo.split(':', 2)
         @registry_port = uri.port
 
         @registry_db = Tempfile.new('bosh_registry_db')
         @registry_connection_settings = {
-            'adapter' => 'sqlite',
-            'database' => @registry_db.path
+          'adapter' => 'sqlite',
+          'database' => @registry_db.path
         }
 
         registry_config = {

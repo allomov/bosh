@@ -38,8 +38,8 @@ module Bosh::Google
       compute_params = {
         :provider => 'google',
         :google_client_email => @google_properties['compute']['client_email'],
-        :google_key_location => @google_properties['compute']['key_location'],
-        :google_project      => @google_properties['compute']['project']
+        :google_project      => @google_properties['compute']['project'],
+        :google_key_location => @google_properties['compute']['key_location']
       }
 
 
