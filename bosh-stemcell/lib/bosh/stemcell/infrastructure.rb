@@ -50,7 +50,7 @@ module Bosh::Stemcell
 
     class Gce < Base
       def initialize
-        super(name: 'gce', hypervisor: 'kvm', default_disk_size: 2048)
+        super(name: 'gce', hypervisor: 'kvm', default_disk_size: 10240)
       end
     end
   end
