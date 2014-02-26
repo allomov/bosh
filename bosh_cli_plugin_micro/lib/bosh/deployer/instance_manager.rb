@@ -139,14 +139,17 @@ module Bosh::Deployer
       end
 
       unless @apply_spec
+        p 'Fetching apply spec'
         step 'Fetching apply spec' do
           @apply_spec = Specification.new(agent.release_apply_spec)
+          p ['agent.release_apply_spec', agent.release_apply_spec]
+          p ['@apply_spec.inspect', @apply_spec.inspect]
         end
       end
 
       # require 'debugger'
       # debugger
-      STDIN.getc
+      # STDIN.getc
 
       step 'Waiting for the director' do
         begin
@@ -455,16 +458,27 @@ module Bosh::Deployer
 
     def wait_until_director_ready
       port = @apply_spec.director_port
+
+      p [:wait_until_director_ready, "@apply_spec.director_port", @apply_spec.director_port]
+
       url = "https://#{bosh_ip}:#{port}/info"
 
+      p [:wait_until_director_ready, "url", url]
+
       wait_until_ready('director', 1, 600) do
+
+        p "===> wait_until_ready('director', 1, 600)"
 
         http_client = HTTPClient.new
 
         http_client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE
-        http_client.ssl_config.verify_callback = proc {}
+        http_client.ssl_config.verify_callback = proc { |is_ok, ctx| p ["http_client.ssl_config.verify_callback", is_ok, ctx]; nil }
 
         response = http_client.get(url)
+        
+        p [:response, :status, response.status]
+        p [:response, :body, response.body]
+
         message = 'Nginx has started but the application it is proxying to has not started yet.'
         raise DirectorGatewayError.new(message) if response.status == 502 || response.status == 503
         info = Yajl::Parser.parse(response.body)
