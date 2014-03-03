@@ -1,6 +1,10 @@
+require 'base64'
+
 module Bosh::Deployer
   class InstanceManager
     class Google < InstanceManager
+
+      # it goes to the VM after apply spec
       def update_spec(spec)
         properties = spec.properties
 
@@ -25,15 +29,15 @@ module Bosh::Deployer
         
         key = properties['google']['private_key']
         err 'Missing properties.google.private_key' unless key
-        @ssh_key = File.expand_path(key)
-        unless File.exists?(@ssh_key)
+        @ssh_key = File.expand_path(key)    # here we have binary data and we convert it to b64 to send it as JSON
+        unless File.exists?(@ssh_key) 
           err "properties.google.private_key '#{key}' does not exist"
         end
 
         # load_keys(properties, 'google.comppute.key_location')
         compute_key_location = properties['google']['compute']['key_location']
         if File.exists?(compute_key_location)
-          properties['google']['compute'].merge!('key' => File.read(compute_key_location))
+          properties['google']['compute'].merge!('key' => Base64.encode64(File.read(compute_key_location)))
         else
           raise "properties.google.compute.key_location '#{compute_key_location}' does not exist."
         end

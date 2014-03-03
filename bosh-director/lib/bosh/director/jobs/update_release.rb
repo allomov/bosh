@@ -141,8 +141,7 @@ module Bosh::Director
         process_jobs
 
         unless @package_rebase_mapping.empty?
-          event_log.begin_stage(
-            "Rebased packages", @package_rebase_mapping.size)
+          event_log.begin_stage("Rebased packages", @package_rebase_mapping.size)
           @package_rebase_mapping.each_pair do |name, transition|
             event_log.track("#{name}: #{transition}") {}
           end

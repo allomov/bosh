@@ -24,7 +24,7 @@ stemcell_infrastructure = "$stemcell_infrastructure"
 hypervisor = "${stemcell_hypervisor:-kvm}"
 
 container_format = "bare"
-disk_format = "raw"
+disk_format = "raw" # ?????
 
 manifest = {
     "name" => stemcell_name,

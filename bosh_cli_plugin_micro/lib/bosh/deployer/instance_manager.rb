@@ -138,18 +138,21 @@ module Bosh::Deployer
         update_persistent_disk
       end
 
+      p ['@apply_spec.inspect1', :@apply_spec, @apply_spec.inspect]
       unless @apply_spec
         p 'Fetching apply spec'
         step 'Fetching apply spec' do
           @apply_spec = Specification.new(agent.release_apply_spec)
-          p ['agent.release_apply_spec', agent.release_apply_spec]
-          p ['@apply_spec.inspect', @apply_spec.inspect]
+          p ['agent.release_apply_spec', 'agent.release_apply_spec', agent.release_apply_spec]
+          p ['@apply_spec.inspect2', :@apply_spec, @apply_spec.inspect]
         end
       end
 
       # require 'debugger'
       # debugger
       # STDIN.getc
+      
+      apply
 
       step 'Waiting for the director' do
         begin
