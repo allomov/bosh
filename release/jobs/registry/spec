@@ -4,6 +4,7 @@ name: registry
 templates:
   registry_ctl:     bin/registry_ctl
   registry.yml.erb: config/registry.yml
+  google-engine-key.p12.erb: ssh/google-engine-key.p12.erb
 
 packages:
   - registry
@@ -70,3 +71,10 @@ properties:
     default: publicURL
   openstack.connection_options:
     description: Hash containing optional connection parameters to the OpenStack API
+
+  google.compute.client_email:
+    description: TODO
+  google.compute.project:
+    description: TODO
+  google.compute.key:
+    description: TODO
