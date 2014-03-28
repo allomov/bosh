@@ -11,7 +11,7 @@ module Fog
 
         GLOBAL_PROJECTS = [ 'google',
                             'debian-cloud',
-                            'centos-cloud',
+                            'centos-cloud'
                           ]
 
         def all

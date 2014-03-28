@@ -63,7 +63,7 @@ module Fog
             new_attributes[:source_image] = new_attributes[:image_name] if new_attributes[:image_name]
 
             disk = service.disks.create(disk_defaults.merge(new_attributes))
-            disk.wait_for { ready? }
+            disk.wait_for { disk.ready? }
             disks = [disk]
           end
 
@@ -77,8 +77,7 @@ module Fog
             :username => ENV['USER'],
           }
 
-          server = new(defaults.merge(new_attributes))
-          server.save
+          server = create(defaults.merge(new_attributes))
           server.wait_for { sshable? }
 
           server
