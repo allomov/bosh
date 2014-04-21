@@ -94,6 +94,18 @@ compiled_package_cache:
     access_key_id: <%= access_key_id %>
     secret_access_key: <%= secret_access_key %>
 <% end %>
+
+<% if_p('compiled_package_cache.options.google_bucket_name',
+        'compiled_package_cache.options.google_access_key_id',
+        'compiled_package_cache.options.google_secret_access_key') do |bucket_name, access_key_id, secret_access_key| %>
+compiled_package_cache:
+  provider: google
+  options:
+    bucket_name: <%= bucket_name %>
+    access_key_id: <%= access_key_id %>
+    secret_access_key: <%= secret_access_key %>
+<% end %>
+
 <% if_p('compiled_package_cache.options.swift_provider',
         'compiled_package_cache.options.container_name') do |swift_provider, container_name| %>
 compiled_package_cache:
@@ -264,8 +276,12 @@ cloud:
 
 
 <% if_p('google.compute.client_email', 'google.compute.project', 
-        'google.storage.access_key', 'google.storage.secret') do |client_email, project, 
-                                                                  storage_access_key, storage_secret| %>
+        'google.storage.access_key', 'google.storage.secret', 
+        'registry.address', 'registry.http.port', 'registry.http.user',
+        'registry.http.password') do |client_email, project, 
+                                      storage_access_key, storage_secret,
+                                      registry_address, registry_port, 
+                                      registry_user, registry_password| %>
   
   plugin: google <% plugin = "google" %>
   properties:
@@ -276,6 +292,10 @@ cloud:
     storage:
       access_key: <%= storage_access_key %>
       secret: <%= storage_secret %>
+    registry:
+      endpoint: http://<%= registry_address %>:<%= registry_port %>
+      user: <%= registry_user %>
+      password: <%= registry_password %>
 
 <% end %>
 
