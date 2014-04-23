@@ -1,5 +1,8 @@
 require 'open3'
 require 'json'
+# require 'fog/google'
+require File.join(File.dirname(__FILE__), "../../fog/google")
+require File.join(File.dirname(__FILE__), "../../fog/google/compute")
 
 module Bosh::Google
 
@@ -33,7 +36,7 @@ module Bosh::Google
 
       # TODO: what does it makes?
       # @agent_properties  = @options["agent"] || {}
-      @google_properties = @options["google"]
+      @google_properties = @options["google"] || @options
 
       compute_params = {
         :provider => 'google',
@@ -221,7 +224,7 @@ module Bosh::Google
                                                username: 'vcap', 
                                                metadata: { 'bosh-metadata' => metadata_json })
 
-          ephemeral_disk_size = resource_pool["zone_name"] || 10 * 1024
+          ephemeral_disk_size = resource_pool["ephemeral_disk_size"] || (24 * 1024)     # 24Gb by default
           ephemeral_disk = compute.disks.create(name: "ephemeral-disk-of-#{server.name}",
                                                 size_gb: (ephemeral_disk_size.to_i / 1024.0).ceil, 
                                                 zone_name: zone_name)

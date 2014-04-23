@@ -22,11 +22,6 @@ namespace :release do
   end
 
 
-  desc 'Create and upload BOSH dev release through scp.'
-  task :force_upload_dev_release => :create_dev_release do |_, args|
-    
-  end
-
   def create_release(options={})
     name = options[:name] || "bosh"
     final = options[:final] || false

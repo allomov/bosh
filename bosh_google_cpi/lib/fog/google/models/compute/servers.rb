@@ -54,7 +54,7 @@ module Fog
             # create the persistent boot disk
             disk_defaults = {
               :name => name,
-              :size_gb => 10,
+              :size_gb => 16,
               :zone_name => zone,
               :source_image => 'debian-7-wheezy-v20131120',
             }
