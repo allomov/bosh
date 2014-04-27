@@ -54,7 +54,7 @@ module Fog
             # create the persistent boot disk
             disk_defaults = {
               :name => name,
-              :size_gb => 16,
+              :size_gb => 10,
               :zone_name => zone,
               :source_image => 'debian-7-wheezy-v20131120',
             }
@@ -72,8 +72,8 @@ module Fog
             :disks => disks,
             :machine_type => 'n1-standard-1',
             :zone_name => zone,
-            :private_key_path => File.expand_path("~/.ssh/gce_id_rsa"),
-            :public_key_path => File.expand_path("~/.ssh/gce_id_rsa.pub"),
+            :private_key_path => File.expand_path("~/.ssh/id_rsa"),
+            :public_key_path => File.expand_path("~/.ssh/id_rsa.pub"),
             :metadata => {},
             :username => ENV['USER']
           }

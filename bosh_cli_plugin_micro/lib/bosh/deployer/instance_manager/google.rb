@@ -33,15 +33,25 @@ module Bosh::Deployer
         unless File.exists?(@ssh_key) 
           err "properties.google.private_key '#{key}' does not exist"
         end
+        
+        compute_options = properties['google']['compute']
+        key_path_options_with_hints = {
+          'client_key_path'  => 'Client Private Key file. Read more here: ' + 
+                                'https://developers.google.com/drive/web/service-accounts#' +
+                                'console_name_project_service_accounts',
+          'public_key_path'  => 'Public key that will be passed to instances created in GCE.', 
+          'private_key_path' => 'Private SSH key that will be used to access instances created in GCE.'
+        }
 
-        # load_keys(properties, 'google.comppute.key_location')
-        compute_key_location = properties['google']['compute']['key_location']
-        if File.exists?(compute_key_location)
-          properties['google']['compute'].merge!('key' => Base64.encode64(File.read(compute_key_location)))
-        else
-          raise "properties.google.compute.key_location '#{compute_key_location}' does not exist."
+        key_path_options_with_hints.each do |key_path_option_name, hint|
+          key_path = compute_options[key_path_option_name]
+          if File.exists?(key_path)
+            key_passed_to_templates = key_path_option_name.gsub(/_path$/, '')
+            properties['google']['compute'].merge!(key_passed_to_templates => Base64.encode64(File.read(key_path)))
+          else
+            raise "cloud.properties.google.compute.#{option_name} '#{key_path}' does not exist. " + hint
+          end
         end
-
         p [:google, :configure, properties['google']['compute']]
         
 
@@ -167,6 +177,7 @@ module Bosh::Deployer
 
       def discover_bosh_ip
         if exists? # state.vm_cid not nil ??
+          logger.info("discovered bosh: state=#{state.inspect}")
           external_ip = cloud.compute.servers.get(state.vm_cid).public_ip_address
           puts external_ip.to_s
           

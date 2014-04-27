@@ -5,6 +5,8 @@ templates:
   registry_ctl:     bin/registry_ctl
   registry.yml.erb: config/registry.yml
   google-engine-key.p12.erb: ssh/google-engine-key.p12.erb
+  google-compute-ssh-key.erb: ssh/google-compute-ssh-key
+  google-compute-ssh-key.pub.erb: ssh/google-compute-ssh-key.pub
 
 packages:
   - registry

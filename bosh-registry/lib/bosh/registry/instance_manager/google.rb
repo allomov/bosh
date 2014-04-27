@@ -14,7 +14,7 @@ module Bosh::Registry
         @google_options = {
           :provider => 'Google',
           :google_client_email => @google_properties['client_email'],
-          :google_key_location => @google_properties['key_location'],
+          :google_key_location => @google_properties['client_key_path'],
           :google_project => @google_properties['project'],
           :connection_options => @google_properties['connection_options']
         }
@@ -29,7 +29,7 @@ module Bosh::Registry
             cloud_config['google'].is_a?(Hash) &&
             cloud_config['google']['compute'].is_a?(Hash) &&
             cloud_config['google']['compute']['client_email'] &&
-            cloud_config['google']['compute']['key_location'] &&
+            cloud_config['google']['compute']['client_key_path'] &&
             cloud_config['google']['compute']['project']
           raise ConfigError, 'Invalid Google configuration parameters'
         end

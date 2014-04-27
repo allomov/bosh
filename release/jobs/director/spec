@@ -16,6 +16,8 @@ templates:
   mime.types: config/mime.types
   scheduler_ctl: bin/scheduler_ctl
   google-engine-key.p12.erb: ssh/google-engine-key.p12
+  google-compute-ssh-key.erb: ssh/google-compute-ssh-key
+  google-compute-ssh-key.pub.erb: ssh/google-compute-ssh-key.pub
 packages:
 - director
 - nginx

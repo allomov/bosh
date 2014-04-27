@@ -51,7 +51,9 @@ cloud:
     compute: 
       client_email: <%= client_email %>
       project: <%= project %>
-      key_location: '/var/vcap/jobs/registry/ssh/google-engine-key.p12'
+      client_key_path: '/var/vcap/jobs/registry/ssh/google-engine-key.p12'
+      public_key_path: '/var/vcap/jobs/registry/ssh/google-compute-ssh-key'
+      private_key_path: '/var/vcap/jobs/registry/ssh/google-compute-ssh-key.pub'      
 <% end %>
 
 <% raise 'Could not find cloud plugin' if plugin.nil? %>

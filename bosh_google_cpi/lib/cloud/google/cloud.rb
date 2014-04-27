@@ -13,6 +13,8 @@ module Bosh::Google
 
     attr_reader   :registry
     attr_reader   :options
+    attr_reader   :compute_options
+    attr_reader   :storage_options
     attr_accessor :logger
     attr_accessor :connection
     attr_accessor :compute
@@ -38,11 +40,13 @@ module Bosh::Google
       # @agent_properties  = @options["agent"] || {}
       @google_properties = @options["google"] || @options
 
+      @compute_options = @google_properties['compute']
+
       compute_params = {
         :provider => 'google',
-        :google_client_email => @google_properties['compute']['client_email'],
-        :google_project      => @google_properties['compute']['project'],
-        :google_key_location => @google_properties['compute']['key_location']
+        :google_client_email => @compute_options['client_email'],
+        :google_project      => @compute_options['project'],
+        :google_key_location => @compute_options['client_key_path']
       }
 
 
@@ -222,7 +226,9 @@ module Bosh::Google
                                                zone_name: zone_name,
                                                machine_type: machine_type,
                                                username: 'vcap', 
-                                               metadata: { 'bosh-metadata' => metadata_json })
+                                               metadata: { 'bosh-metadata' => metadata_json }, 
+                                               private_key_path: @compute_options['private_key_path'],
+                                               public_key_path:  @compute_options['public_key_path'])
 
           ephemeral_disk_size = resource_pool["ephemeral_disk_size"] || (24 * 1024)     # 24Gb by default
           ephemeral_disk = compute.disks.create(name: "ephemeral-disk-of-#{server.name}",

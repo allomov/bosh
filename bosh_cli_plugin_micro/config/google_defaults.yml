@@ -26,10 +26,11 @@ cloud:
     google:
       client_email:
       project:
-      key_location:
+      client_key_path:
       storage_access:
       storage_secret:
-      private_key:
+      private_key_path: '~/.ssh/id_rsa'
+      public_key_path:  '~/.ssh/id_rsa.pub'
 
       endpoint_type: publicURL
       ssh_user: vcap

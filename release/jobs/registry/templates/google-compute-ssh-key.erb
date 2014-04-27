@@ -1,0 +1,1 @@
+<% require 'base64'; if_p('google.compute.private_ssh_key') do |key| %><%= Base64.decode64(key) %><% end %>
