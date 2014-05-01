@@ -221,6 +221,9 @@ module Bosh::Google
 
           puts "metadata : #{metadata_json.inspect}"
 
+          @logger.info("public_key_path #{@compute_options['private_key_path']}")
+          @logger.info("public_key_path #{@compute_options['public_key_path']}")
+
           server = @compute.servers.bootstrap( name: server_name,
                                                source_image: image.name,
                                                zone_name: zone_name,

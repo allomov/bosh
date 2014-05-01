@@ -27,12 +27,12 @@ module Bosh::Deployer
         @ssh_port = properties['google']['ssh_port'] || 22
         @ssh_wait = properties['google']['ssh_wait'] || 60
         
-        key = properties['google']['private_key']
-        err 'Missing properties.google.private_key' unless key
-        @ssh_key = File.expand_path(key)    # here we have binary data and we convert it to b64 to send it as JSON
-        unless File.exists?(@ssh_key) 
-          err "properties.google.private_key '#{key}' does not exist"
-        end
+        # key = properties['google']['private_key']
+        # err 'Missing properties.google.private_key' unless key
+        # @ssh_key = File.expand_path(key)    # here we have binary data and we convert it to b64 to send it as JSON
+        # unless File.exists?(@ssh_key) 
+        #   err "properties.google.private_key '#{key}' does not exist"
+        # end
         
         compute_options = properties['google']['compute']
         key_path_options_with_hints = {
@@ -49,7 +49,7 @@ module Bosh::Deployer
             key_passed_to_templates = key_path_option_name.gsub(/_path$/, '')
             properties['google']['compute'].merge!(key_passed_to_templates => Base64.encode64(File.read(key_path)))
           else
-            raise "cloud.properties.google.compute.#{option_name} '#{key_path}' does not exist. " + hint
+            err("cloud.properties.google.compute.#{option_name} '#{key_path}' does not exist. " + hint)
           end
         end
         p [:google, :configure, properties['google']['compute']]

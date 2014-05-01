@@ -111,15 +111,24 @@ module Fog
         end
 
         def add_ssh_key username, key
-          self.metadata ||= {} 
-          self.metadata.default = ""
+          if self.metadata.nil?
+            self.metadata = Hash.new("")
+          end
+
           # You can have multiple SSH keys, seperated by newlines.
           # https://developers.google.com/compute/docs/console?hl=en#sshkeys
-          self.metadata["sshKeys"] += "\n" unless self.metadata["sshKeys"].empty?
-          self.metadata["sshKeys"] += key.strip
+          if !self.metadata["sshKeys"]
+            self.metadata["sshKeys"] = ""
+          end
+
+          if !self.metadata["sshKeys"].empty?
+            self.metadata["sshKeys"] += "\n"
+          end
+
+          self.metadata["sshKeys"] += "#{username}:#{key.strip}"
+
           return self.metadata
         end
-
 
         def reload
           data = service.get_server(self.name, self.zone_name).body
