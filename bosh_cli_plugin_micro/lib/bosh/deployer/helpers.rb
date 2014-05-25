@@ -70,12 +70,15 @@ module Bosh::Deployer
         logger.info("Starting SSH session for port forwarding to #{@ssh_user}@#{ip}...")
         loop do
           begin
+            # remote_tunnel
             @sessions[port] = Net::SSH.start(ip, @ssh_user, keys: [@ssh_key], paranoid: false)
             p [:remote_tunnel, "ssh #{@ssh_user}@#{ip}: ESTABLISHED"]
             logger.debug("ssh #{@ssh_user}@#{ip}: ESTABLISHED")
             break
           rescue => e
             p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} failed: #{e.inspect}"]
+            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} failed: #{e.message}"]
+            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} failed: #{e.backtrace.join("\n")}"]
             logger.debug("ssh start #{@ssh_user}@#{ip} failed: #{e.inspect}")
             sleep 1
           end

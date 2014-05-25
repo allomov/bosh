@@ -27,12 +27,13 @@ module Bosh::Deployer
         @ssh_port = properties['google']['ssh_port'] || 22
         @ssh_wait = properties['google']['ssh_wait'] || 60
         
-        # key = properties['google']['private_key']
-        # err 'Missing properties.google.private_key' unless key
-        # @ssh_key = File.expand_path(key)    # here we have binary data and we convert it to b64 to send it as JSON
-        # unless File.exists?(@ssh_key) 
-        #   err "properties.google.private_key '#{key}' does not exist"
-        # end
+        key = properties['google']['private_key_path']
+        err 'Missing properties.google.private_key_path' unless key
+        # here we have binary data and we convert it to b64 to send it as JSON
+        @ssh_key = File.expand_path(key)
+        unless File.exists?(@ssh_key) 
+          err "properties.google.private_key_path: '#{key}' file does not exist."
+        end
         
         compute_options = properties['google']['compute']
         key_path_options_with_hints = {
