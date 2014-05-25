@@ -24,13 +24,15 @@ cloud:
   plugin: google
   properties:
     google:
-      client_email:
-      project:
-      client_key_path:
-      storage_access:
-      storage_secret:
-      private_key_path: '~/.ssh/id_rsa'
-      public_key_path:  '~/.ssh/id_rsa.pub'
+      compute: 
+        client_email:
+        project:
+        client_key_path:
+        private_key_path: '~/.ssh/id_rsa'
+        public_key_path:  '~/.ssh/id_rsa.pub'
+      storage:
+        storage_access:
+        storage_secret:
 
       endpoint_type: publicURL
       ssh_user: vcap
