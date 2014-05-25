@@ -20,6 +20,7 @@ Gem::Specification.new do |s|
   s.bindir       = 'bin'
   s.executables  = %w()
 
+  s.add_dependency 'jwt', '~>0.1.5'
   s.add_dependency 'google-api-client', '~>0.6.4'
   s.add_dependency 'fog', '1.14.0'
 
