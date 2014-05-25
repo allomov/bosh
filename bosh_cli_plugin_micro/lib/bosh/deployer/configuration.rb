@@ -10,6 +10,8 @@ module Bosh::Deployer
       plugin = cloud_plugin(config)
 
       config = deep_merge(load_defaults(plugin), config)
+      p [:configure, :plugin, './bosh_cli_plugin_micro/lib/bosh/deployer/configuration.rb', plugin]
+      p [:configure, :config, './bosh_cli_plugin_micro/lib/bosh/deployer/configuration.rb', config]
 
       @base_dir = config['dir']
       FileUtils.mkdir_p(@base_dir)
