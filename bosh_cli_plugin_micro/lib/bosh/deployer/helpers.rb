@@ -76,9 +76,12 @@ module Bosh::Deployer
             logger.debug("ssh #{@ssh_user}@#{ip}: ESTABLISHED")
             break
           rescue => e
+            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} ip: #{ip}"]
+            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} ssh_key: #{@ssh_key}"]
+            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} ssh_user: #{@ssh_user}"]
             p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} failed: #{e.inspect}"]
-            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} failed: #{e.message}"]
-            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} failed: #{e.backtrace.join("\n")}"]
+            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} message: #{e.message}"]
+            p [:remote_tunnel, "ssh start #{@ssh_user}@#{ip} backtrace: #{e.backtrace.join("\n")}"]
             logger.debug("ssh start #{@ssh_user}@#{ip} failed: #{e.inspect}")
             sleep 1
           end
