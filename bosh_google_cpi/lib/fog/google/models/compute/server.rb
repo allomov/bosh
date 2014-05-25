@@ -125,7 +125,9 @@ module Fog
             self.metadata["sshKeys"] += "\n"
           end
 
-          self.metadata["sshKeys"] += "#{username}:#{key.strip}"
+          # TODO: FIX: super wierd hack to allow stemcell to get ssh keys
+          self.metadata["sshKeys"] += "#{key.strip}"
+          # self.metadata["sshKeys"] += "#{username}:#{key.strip}"
 
           return self.metadata
         end
