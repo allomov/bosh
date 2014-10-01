@@ -61,6 +61,11 @@ cat > ${bosh_app_dir}/bosh/agent.json << EOF
 }
 EOF
 
+if [ "`uname -m`" == "ppc64le" ]; then
+  export PATH=/var/vcap/bosh/gccgo/bin:$PATH
+  export LD_LIBRARY_PATH=/var/vcap/bosh/gccgo/lib64
+fi
+
 # Start agent
 /var/vcap/bosh/bin/bosh-agent -P dummy -M dummy -C ${bosh_app_dir}/bosh/agent.json &
 agent_pid=$!
