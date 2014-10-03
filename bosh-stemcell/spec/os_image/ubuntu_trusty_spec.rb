@@ -82,8 +82,6 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
         it { should contain 'deb-src http://archive.ubuntu.com/ubuntu trusty multiverse' }
         it { should contain 'deb http://ports.ubuntu.com/ubuntu-ports/ trusty-updates multiverse' }
         it { should contain 'deb-src http://archive.ubuntu.com/ubuntu trusty-updates multiverse' }
-        it { should contain 'deb http://ports.ubuntu.com/ubuntu-ports/ trusty-backports main restricted universe multiverse' }
-        it { should contain 'deb-src http://archive.ubuntu.com/ubuntu trusty-backports main restricted universe multiverse' }
 
         it { should contain 'deb http://ports.ubuntu.com/ubuntu-ports/ trusty-security main restricted' }
         it { should contain 'deb-src http://ports.ubuntu.com/ubuntu-ports/ trusty-security main restricted' }
@@ -212,7 +210,7 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
           it { should be_file }
         end
       end
-     else 
+    else 
       %w(
         grub
       ).each do |pkg|
@@ -225,7 +223,7 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
           it { should be_file }
         end
       end
-     end
+    end
   end
 
   context 'installed by system_kernel' do
