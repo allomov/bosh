@@ -6,6 +6,8 @@ Tools for creating stemcells
 
 ### Once-off manual steps:
 
+Note: Use US East (Northern Virginia) region when using AWS in following steps. AMI (Amazon Machine Image) to be used for the stemcell building VM is in the US East (Northern Virginia) region.
+
 0. Upload a keypair called "bosh" to AWS that you'll use to connect to the remote vm later
 0. Create "bosh-stemcell" security group on AWS to allow SSH access to the stemcell (once per AWS account)
 0. Add instructions to set BOSH_AWS_... environment variables
@@ -48,7 +50,7 @@ If you have changes that will require new OS image you need to build one. A stem
 The arguments to `stemcell:build_os_image` are:
 
 1. *`operating_system_name`* identifies which type of OS to fetch. Determines which package repository and packaging tool will be used to download and assemble the files. Must match a value recognized by the  [OperatingSystem](lib/bosh/stemcell/operating_system.rb) module. Currently, only `ubuntu` and `centos` are recognized.
-2. *`operating_system_version`* an identifier that the system may use to decide which release of the OS to download. Acceptable values depend on the operating system. For `ubuntu`, use `trusty`. For `centos`, the value is currently ignored.
+2. *`operating_system_version`* an identifier that the system may use to decide which release of the OS to download. Acceptable values depend on the operating system. For `ubuntu`, use `trusty`. For `centos`, use `6` or `7`. No other combinations are presently supported.
 3. *`os_image_path`* the path to write the finished OS image tarball to. If a file exists at this path already, it will be overwritten without warning.
 
 See below [Building the stemcell with local OS image](#building-the-stemcell-with-local-os-image) on how to build stemcell with the new OS image.
@@ -89,3 +91,23 @@ AWS stemcells can be shipped in light format which includes a reference to a pub
       export BOSH_AWS_SECRET_ACCESS_KEY=YOUR-AWS-SECRET-KEY
       bundle exec rake stemcell:build_light[/tmp/bosh-stemcell.tgz,hvm]
     ' remote
+
+### When things go sideways
+
+If you find yourself debugging any of the above processes, here is what you need to know:
+
+1. Most of the action happens in Bash scripts, which are referred to as _stages_, and can
+   be found in `stemcell_builder/stages/<stage_name>/apply.sh`.
+2. You should make all changes on your local machine, and sync them over to the AWS stemcell
+   building machine using `vagrant provision remote` as explained earlier on this page.
+3. While debugging a particular stage that is failing, you can resume the process from that
+   stage by adding `resume_from=<stage_name>` to the end of your `bundle exec rake` command.
+   When a stage's `apply.sh` fails, you should see a message of the form
+   `Can't find stage '<stage>' to resume from. Aborting.` so you know which stage failed and
+   where you can resume from after fixing the problem.
+
+   For example:
+
+   ```
+   bundle exec rake stemcell:build_os_image[ubuntu,trusty,/tmp/ubuntu_base_image.tgz] resume_from=rsyslog_build
+   ```

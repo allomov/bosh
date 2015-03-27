@@ -2,7 +2,14 @@ require 'spec_helper'
 require 'rbconfig'
 
 describe 'Ubuntu 14.04 OS image', os_image: true do
-  it_behaves_like 'an OS image'
+  it_behaves_like 'every OS image'
+  it_behaves_like 'an upstart-based OS image'
+
+  context 'installed by rsyslog_build' do
+    describe command('rsyslogd -v') do
+      it { should return_stdout /7\.4\.6/ }
+    end
+  end
 
   describe package('apt') do
     it { should be_installed }
@@ -228,10 +235,10 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
 
   context 'installed by system_kernel' do
     %w(
-      linux-headers-3.16.0-31
-      linux-headers-3.16.0-31-generic
-      linux-image-3.16.0-31-generic
-      linux-image-extra-3.16.0-31-generic
+      linux-headers-3.16.0-33
+      linux-headers-3.16.0-33-generic
+      linux-image-3.16.0-33-generic
+      linux-image-extra-3.16.0-33-generic
     ).each do |pkg|
       describe package(pkg) do
         it { should be_installed }
@@ -268,7 +275,7 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
     end
   end
 
-  context 'installed by rsyslog' do
+  context 'installed by rsyslog_build' do
     describe file('/etc/rsyslog.d/enable-kernel-logging.conf') do
       it { should be_file }
       it { should contain('ModLoad imklog') }

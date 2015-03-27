@@ -151,6 +151,37 @@ module Bosh::Stemcell
           subject.prepare_build
         }.to change { Dir.exists?(File.join(root_dir, 'work/work/stemcell')) }.from(false).to(true)
       end
+
+      context 'when resume_from is set' do
+        before do
+          ENV['resume_from'] = 'stage_1'
+
+          FileUtils.mkdir_p(build_path)
+        end
+
+        it 'does not run sanitize' do
+          expect(shell).to_not receive(:run)
+
+          subject.prepare_build
+
+          expect(Dir.exists?(build_path)).to be(true)
+        end
+
+        it 'does not run prepare_build_path' do
+          leftover_file = File.join(build_path, 'some_file')
+          FileUtils.touch(leftover_file)
+
+          subject.prepare_build
+          expect(File.exists?(leftover_file)).to be(true)
+        end
+
+        it 'still updates the settings file' do
+          subject.prepare_build
+
+          expect(File.read(settings_file)).to match(/some=var/)
+          expect(File.read(settings_file)).to match(/hello=world/)
+        end
+      end
     end
 
     describe '#os_image_rspec_command' do
@@ -163,23 +194,8 @@ module Bosh::Stemcell
             'OS_IMAGE=/some/os_image.tgz',
             'bundle exec rspec -fd',
             "spec/os_image/common_spec.rb",
+            "spec/os_image/#{operating_system.name}_common_spec.rb",
             "spec/os_image/#{operating_system.name}_#{operating_system.version}_spec.rb",
-          ].join(' ')
-
-          expect(subject.os_image_rspec_command).to eq(expected_rspec_command)
-        end
-      end
-
-      context 'when operating system does not have version' do
-        before { allow(operating_system).to receive(:version).and_return(nil) }
-
-        it 'returns the correct command' do
-          expected_rspec_command = [
-            "cd #{stemcell_specs_dir};",
-            'OS_IMAGE=/some/os_image.tgz',
-            'bundle exec rspec -fd',
-            "spec/os_image/common_spec.rb",
-            "spec/os_image/#{operating_system.name}_spec.rb",
           ].join(' ')
 
           expect(subject.os_image_rspec_command).to eq(expected_rspec_command)
@@ -188,38 +204,19 @@ module Bosh::Stemcell
     end
 
     describe '#stemcell_rspec_command' do
-      context 'when operation system has version' do
-        before { allow(operating_system).to receive(:version).and_return('fake-version') }
+      before { allow(operating_system).to receive(:version).and_return('fake-version') }
 
-        it 'returns the correct command' do
-          expected_rspec_command = [
-            "cd #{stemcell_specs_dir};",
-            "STEMCELL_IMAGE=#{File.join(work_path, 'fake-root-disk-image.raw')}",
-            'bundle exec rspec -fd',
-            "spec/stemcells/#{operating_system.name}_#{operating_system.version}_spec.rb",
-            "spec/stemcells/#{agent.name}_agent_spec.rb",
-            "spec/stemcells/#{infrastructure.name}_spec.rb",
-          ].join(' ')
+      it 'returns the correct command' do
+        expected_rspec_command = [
+          "cd #{stemcell_specs_dir};",
+          "STEMCELL_IMAGE=#{File.join(work_path, 'fake-root-disk-image.raw')}",
+          'bundle exec rspec -fd',
+          "spec/stemcells/#{operating_system.name}_#{operating_system.version}_spec.rb",
+          "spec/stemcells/#{agent.name}_agent_spec.rb",
+          "spec/stemcells/#{infrastructure.name}_spec.rb",
+        ].join(' ')
 
-          expect(subject.stemcell_rspec_command).to eq(expected_rspec_command)
-        end
-      end
-
-      context 'when operation system does not have version' do
-        before { allow(operating_system).to receive(:version).and_return(nil) }
-
-        it 'returns the correct command' do
-          expected_rspec_command = [
-            "cd #{stemcell_specs_dir};",
-            "STEMCELL_IMAGE=#{File.join(work_path, 'fake-root-disk-image.raw')}",
-            'bundle exec rspec -fd',
-            "spec/stemcells/#{operating_system.name}_spec.rb",
-            "spec/stemcells/#{agent.name}_agent_spec.rb",
-            "spec/stemcells/#{infrastructure.name}_spec.rb",
-          ].join(' ')
-
-          expect(subject.stemcell_rspec_command).to eq(expected_rspec_command)
-        end
+        expect(subject.stemcell_rspec_command).to eq(expected_rspec_command)
       end
     end
 

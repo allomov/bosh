@@ -1,7 +1,3 @@
-require 'ruby_vim_sdk'
-require 'cloud/vsphere/cloud_searcher'
-require 'cloud/vsphere/soap_stub'
-
 module VSphereCloud
 
   class Client
@@ -19,7 +15,7 @@ module VSphereCloud
 
       @metrics_cache  = {}
       @lock = Mutex.new
-      @logger = Bosh::Clouds::Config.logger
+      @logger = options.fetch(:logger) { Bosh::Clouds::Config.logger }
 
       @cloud_searcher = CloudSearcher.new(service_content, @logger)
     end
@@ -70,8 +66,8 @@ module VSphereCloud
       end
     end
 
-    def power_off_vm(vm)
-      task = vm.power_off
+    def power_off_vm(vm_mob)
+      task = vm_mob.power_off
       wait_for_task(task)
     end
 
@@ -92,38 +88,22 @@ module VSphereCloud
     end
 
     def delete_disk(datacenter, path)
-      tasks = []
+      base_path = path.chomp(File.extname(path))
       [".vmdk", "-flat.vmdk"].each do |extension|
-        tasks << @service_content.file_manager.delete_file("#{path}#{extension}", datacenter)
-      end
-      tasks.each do |task|
-        begin
-          wait_for_task(task)
-        rescue => e
-          unless e.message =~ /File .* was not found/
-            raise e
-          end
-        end
+        delete_path(datacenter, "#{base_path}#{extension}")
       end
     end
 
     def move_disk(source_datacenter, source_path, dest_datacenter, dest_path)
+      create_parent_folder(dest_datacenter, dest_path)
       tasks = []
+      base_source_path = source_path.chomp(File.extname(source_path))
+      base_dest_path = source_path.chomp(File.extname(dest_path))
       [".vmdk", "-flat.vmdk"].each do |extension|
         tasks << @service_content.file_manager.move_file(
-          "#{source_path}#{extension}", source_datacenter,
-          "#{dest_path}#{extension}", dest_datacenter, false
+          "#{base_source_path}#{extension}", source_datacenter,
+          "#{base_dest_path}#{extension}", dest_datacenter, false
         )
-      end
-
-      tasks.each { |task| wait_for_task(task) }
-    end
-
-    def copy_disk(source_datacenter, source_path, dest_datacenter, dest_path)
-      tasks = []
-      [".vmdk", "-flat.vmdk"].each do |extension|
-        tasks << @service_content.file_manager.copy_file("#{source_path}#{extension}", source_datacenter,
-                                                         "#{dest_path}#{extension}", dest_datacenter, false)
       end
 
       tasks.each { |task| wait_for_task(task) }
@@ -150,22 +130,6 @@ module VSphereCloud
     def delete_folder(folder)
       task = folder.destroy
       wait_for_task(task)
-    end
-
-    def has_disk?(disk_path, disk_datacenter)
-      datacenter = find_by_inventory_path(disk_datacenter)
-
-      [".vmdk", "-flat.vmdk"].each do |extension|
-        begin
-          uuid = @service_content.virtual_disk_manager.query_virtual_disk_uuid(
-            "#{disk_path}#{extension}", datacenter
-          )
-          return true if uuid
-        rescue VimSdk::SoapError
-        end
-      end
-
-      false
     end
 
     def find_by_inventory_path(path)
@@ -245,7 +209,62 @@ module VSphereCloud
       result
     end
 
+    def find_disk(disk_cid, datastore, disk_folder)
+      disk_path = "[#{datastore.name}] #{disk_folder}/#{disk_cid}.vmdk"
+      disk_size_in_mb = find_disk_size_using_browser(datastore, disk_cid, disk_folder)
+      disk_size_in_mb.nil? ? nil : Resources::Disk.new(disk_cid, disk_size_in_mb, datastore, disk_path)
+    end
+
+    def create_disk(datacenter, datastore, disk_cid, disk_folder, disk_size_in_mb)
+      disk_path = "[#{datastore.name}] #{disk_folder}/#{disk_cid}.vmdk"
+
+      create_parent_folder(datacenter, disk_path)
+
+      disk_spec = VimSdk::Vim::VirtualDiskManager::FileBackedVirtualDiskSpec.new
+      disk_spec.disk_type = 'preallocated'
+      disk_spec.capacity_kb = disk_size_in_mb * 1024
+      disk_spec.adapter_type = 'lsiLogic'
+
+      task = service_content.virtual_disk_manager.create_virtual_disk(
+        disk_path,
+        datacenter.mob,
+        disk_spec
+      )
+      wait_for_task(task)
+
+      Resources::Disk.new(disk_cid, disk_size_in_mb, datastore, disk_path)
+    end
+
     private
+
+    def create_parent_folder(datacenter, disk_path)
+      destination_folder = File.dirname(disk_path)
+      create_datastore_folder(destination_folder, datacenter.mob)
+    end
+
+    def find_disk_size_using_browser(datastore, disk_cid, disk_folder)
+      search_spec_details = VimSdk::Vim::Host::DatastoreBrowser::FileInfo::Details.new
+      search_spec_details.file_type = true # actually return VmDiskInfos not FileInfos
+
+      query_details = VimSdk::Vim::Host::DatastoreBrowser::VmDiskQuery::Details.new
+      query_details.capacity_kb = true
+
+      query = VimSdk::Vim::Host::DatastoreBrowser::VmDiskQuery.new
+      query.details = query_details
+
+      search_spec = VimSdk::Vim::Host::DatastoreBrowser::SearchSpec.new
+      search_spec.details = search_spec_details
+      search_spec.match_pattern = ["#{disk_cid}.vmdk"]
+      search_spec.query = [query]
+
+      vm_disk_infos = wait_for_task(datastore.mob.browser.search("[#{datastore.name}] #{disk_folder}", search_spec)).file
+
+      return nil if vm_disk_infos.empty?
+
+      vm_disk_infos.first.capacity_kb / 1024
+    rescue VimSdk::SoapError
+      nil
+    end
 
     def find_perf_metric_names(mob, names)
       @lock.synchronize do

@@ -28,8 +28,10 @@ module Bosh::Stemcell
     attr_reader :version
 
     def prepare_build
-      sanitize
-      prepare_build_path
+      if (ENV['resume_from'] == NIL)
+        sanitize
+        prepare_build_path
+      end
       copy_stemcell_builder_to_build_path
       prepare_work_root
       prepare_stemcell_path
@@ -42,6 +44,7 @@ module Bosh::Stemcell
         "OS_IMAGE=#{os_image_tarball_path}",
         'bundle exec rspec -fd',
         "spec/os_image/common_spec.rb",
+        "spec/os_image/#{operating_system.name}_common_spec.rb",
         "spec/os_image/#{operating_system_spec_name}_spec.rb",
       ].join(' ')
     end
@@ -84,6 +87,10 @@ module Bosh::Stemcell
       work_path
     end
 
+    def stemcell_disk_size
+      stemcell_builder_options.image_create_disk_size
+    end
+
     def command_env
       "env #{hash_as_bash_env(proxy_settings_from_environment)}"
     end
@@ -117,11 +124,7 @@ module Bosh::Stemcell
     end
 
     def operating_system_spec_name
-      spec_name = operating_system.name
-      if operating_system.version
-        spec_name = "#{spec_name}_#{operating_system.version}"
-      end
-      spec_name
+      "#{operating_system.name}_#{operating_system.version}"
     end
 
     def prepare_build_path

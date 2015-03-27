@@ -42,7 +42,7 @@ group :development, :test do
   gem 'bosh-stemcell', path: 'bosh-stemcell'
   gem 'serverspec'
 
-  gem 'rspec', '~> 3.0'
+  gem 'rspec', '~> 3.0.0'
   gem 'rspec-its'
   gem 'rspec-instafail'
 
@@ -58,7 +58,7 @@ group :development, :test do
 
   # Explicitly do not require serverspec dependency
   # so that it could be monkey patched in a deterministic way
-  # in `bosh-stemcell/spec/support/serverspec.rb`
+  # in `bosh-stemcell/spec/support/serverspec_monkeypatch.rb`
   gem 'specinfra', require: nil
 
   # for director
@@ -71,6 +71,6 @@ group :development, :test do
   gem 'rugged'
 
   gem 'sqlite3'
-  gem 'timecop'
+  gem 'timecop', '~>0.7.1'
   gem 'jenkins_api_client'
 end
