@@ -75,9 +75,10 @@ deb http://archive.ubuntu.com/ubuntu $DISTRIB_CODENAME main universe multiverse
 deb http://archive.ubuntu.com/ubuntu $DISTRIB_CODENAME-updates main universe multiverse
 deb http://security.ubuntu.com/ubuntu $DISTRIB_CODENAME-security main universe multiverse
 EOS
-
 fi
 
+mount sysfs $chroot/sys -t sysfs
 # Upgrade upstart first, to prevent it from messing up our stubs and starting daemons anyway
 pkg_mgr install upstart
 pkg_mgr dist-upgrade
+umount $chroot/sys

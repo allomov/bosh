@@ -151,6 +151,8 @@ then
   cat > ${image_mount_point}/etc/fstab <<FSTAB
 # /etc/fstab Created by BOSH Stemcell Builder
 UUID=${uuid} / ext4 defaults 1 1
+/sys sysfs defaults 0 0
+/proc proc defaults 0 0
 FSTAB
 else
   echo "Unknown OS, exiting"
@@ -161,7 +163,7 @@ if [ -f ${image_mount_point}/etc/debian_version ] # Ubuntu
 then
   if [ "`uname -m`" == "ppc64le" ]; then
     run_in_chroot ${image_mount_point} "
-    echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash selinux=0 cgroup_enable=memory swapaccount=1 console=tty0 console=ttyS0,115200n8"' >> /etc/default/grub
+    echo GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash selinux=0 cgroup_enable=memory swapaccount=1 console=tty0 console=ttyS0,115200n8\" >> /etc/default/grub
     update-grub
     grub-mkconfig -o /boot/grub/grub.cfg
     "
