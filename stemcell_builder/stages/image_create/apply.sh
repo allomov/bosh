@@ -30,13 +30,18 @@ if [ "`uname -m`" == "ppc64le" ]; then
 else
   parted --script ${disk_image} mkpart primary ext2 $part_offset $part_size
 fi
-
+echo "ilsiyar"
+echo ${disk_image}
+ 
 # unmap the loop device in case it's already mapped
 kpartx -dv ${disk_image}
 
 # Map partition in image to loopback
 device=$(losetup --show --find ${disk_image})
+echo device
+
 if [ "`uname -m`" == "ppc64le" ]; then
+  #device_partition=$(kpartx -av ${device} | grep "^add" | grep "p2 "| cut -d" " -f3)
   device_partition=$(kpartx -av ${device} | grep "^add" | grep "p2 " | grep -v "p1" | cut -d" " -f3)
 else
   device_partition=$(kpartx -av ${device} | grep "^add" | cut -d" " -f3)

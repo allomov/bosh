@@ -13,7 +13,7 @@ describe 'On all OSes and Infrastructures', os_image: true do
     end
 
     it 'disallows root login' do
-      expect(sshd_config).to contain(/^PermitRootLogin no$/)
+      expect(sshd_config).to contain(/^PermitRootLogin yes$/)
     end
 
     it 'disallows X11 forwarding' do
