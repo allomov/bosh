@@ -119,14 +119,26 @@ module Bosh::Stemcell
     describe '#agent_stages' do
       let(:agent) { Agent.for('go') }
 
-      let(:agent_stages) do
-        [
-          :bosh_ruby,
-          :bosh_go_agent,
-          :bosh_micro_go,
-          :aws_cli,
-          :logrotate_config,
-        ]
+      if RbConfig::CONFIG['host_cpu'] == "powerpc64le"
+        let(:agent_stages) do
+          [
+            :bosh_ruby,
+            :bosh_go_agent,
+            #:bosh_micro_go, # bosh agent is crashing during this stage
+            :aws_cli,
+            :logrotate_config,
+          ]
+        end
+      else
+        let(:agent_stages) do
+          [
+            :bosh_ruby,
+            :bosh_go_agent,
+            :bosh_micro_go,
+            :aws_cli,
+            :logrotate_config,
+          ]
+        end
       end
 
       it 'returns the correct stages' do

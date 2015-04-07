@@ -33,6 +33,10 @@ module Bosh
 
       def manifest(disk_format)
         infrastructure = definition.infrastructure
+        architecture = 'x86_64'
+        if (RbConfig::CONFIG['host_cpu'] == "powerpc64le") 
+          architecture = 'ppc64'
+        end
 
         stemcell_name = "bosh-#{definition.stemcell_name(disk_format)}"
         {
@@ -50,7 +54,7 @@ module Bosh
             'container_format' => 'bare',
             'os_type' => 'linux',
             'os_distro' => definition.operating_system.name,
-            'architecture' => 'x86_64',
+            'architecture' => architecture,
           }.merge(infrastructure.additional_cloud_properties)
         }
       end
