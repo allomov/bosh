@@ -164,7 +164,7 @@ then
   if [ "`uname -m`" == "ppc64le" ]; then
     run_in_chroot ${image_mount_point} "
     if [ -f /etc/default/grub ]; then
-      sed -i -e 's/^GRUB_CMDLINE_LINUX=\\\"\\\"/GRUB_CMDLINE_LINUX=\\\"quiet splash selinux=0 cgroup_enable=memory swapaccount=1 console=tty0 console=ttyS0,115200n8\\\"/' /etc/default/grub
+      sed -i -e 's/^GRUB_CMDLINE_LINUX=\\\"\\\"/GRUB_CMDLINE_LINUX=\\\"quiet splash selinux=0 cgroup_enable=memory swapaccount=1 \\\"/' /etc/default/grub
     fi
     grub-mkconfig -o /boot/grub/grub.cfg
     "
@@ -177,6 +177,7 @@ title ${os_name} (${kernel_version})
   kernel /boot/vmlinuz-${kernel_version} ro root=UUID=${uuid} selinux=0 cgroup_enable=memory swapaccount=1 console=tty0 console=ttyS0,115200n8
   initrd /boot/${initrd_file}
 GRUB_CONF
+fi
 elif [ -f ${image_mount_point}/etc/redhat-release ] # Centos or RHEL
 then
 
