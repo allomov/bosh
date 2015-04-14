@@ -73,7 +73,7 @@ if [ "`uname -m`" == "ppc64le" ]; then
 fi
 
 # Start agent
-/var/vcap/bosh/bin/bosh-agent -I dummy -P dummy -M dummy -C ${bosh_app_dir}/bosh/agent.json &
+/var/vcap/bosh/bin/bosh-agent -P dummy -M dummy -C ${bosh_app_dir}/bosh/agent.json &
 agent_pid=$!
 
 echo "Starting BOSH Agent for compiling micro bosh package, agent pid is $agent_pid"
