@@ -5,9 +5,8 @@ module Bosh::Director
     class MultiCloudController < BaseController
 
       post '/', :consumes => :yaml do
-        properties = request.body.string
+        properties = json_decode(request.body.string)
         Bosh::Director::Api::MultiCloudManager.new.create(properties)
-
         status(201)
       end
 

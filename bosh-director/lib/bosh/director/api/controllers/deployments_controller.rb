@@ -271,6 +271,8 @@ module Bosh::Director
         options['recreate'] = true if params['recreate'] == 'true'
         latest_cloud_config = Bosh::Director::Api::CloudConfigManager.new.latest
 
+        # request.body
+
         task = @deployment_manager.create_deployment(@user, request.body, latest_cloud_config, options)
         redirect "/tasks/#{task.id}"
       end

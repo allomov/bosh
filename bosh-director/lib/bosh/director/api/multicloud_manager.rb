@@ -2,12 +2,13 @@ module Bosh
   module Director
     module Api
       class MultiCloudManager
-        def add(config_yaml)          
-          properties = json_decode(config_yaml)
+        def add(properties)
           cloud_config = Bosh::Director::Api::CloudConfigManager.new.update(properties['properties'])
           cloud = Bosh::Director::Models::Cloud.new(
             name: properties['name'],
             type: properties['type'],
+            endpoint: properties['endpoint'],
+            # agent_properties: properties['endpoint'],
             cloud_config: cloud_config
           )
           cloud.save
