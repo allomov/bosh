@@ -38,9 +38,9 @@ module Bosh::Cli::Command
       config_yaml = read_yaml_file(config_path)
 
       if director.create_cloud(config_yaml)
-        say("Successfully updated cloud config")
+        say("Successfully add the cloud.".make_green)
       else
-        err("Failed to update cloud config")
+        err("Failed to update cloud config".make_red)
       end
       
     end

@@ -1,6 +1,7 @@
 require 'cli/core_ext'
 require 'cli/errors'
 require 'cli/cloud_config'
+require 'cli/cloud'
 
 require 'json'
 require 'httpclient'
