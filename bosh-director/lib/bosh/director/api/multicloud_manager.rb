@@ -10,9 +10,11 @@ module Bosh
             type: properties['type'],
             endpoint: properties['endpoint'],
             # agent_properties: properties['endpoint'],
-            cloud_config: cloud_config
+            cloud_config_id: cloud_config.id
           )
           cloud.save
+          cloud_config.cloud_id = cloud.id
+          cloud_config.save
         end
 
         def delete(cloud_id)
