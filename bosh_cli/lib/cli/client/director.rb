@@ -596,6 +596,11 @@ module Bosh
           end
         end
 
+        def create_cloud(config_yaml)
+          status, _ = post('/clouds', 'text/yaml', config_yaml)
+          status == 201
+        end
+
 
         def update_cloud_config(cloud_config_yaml)
           status, _ = post('/cloud_configs', 'text/yaml', cloud_config_yaml)
