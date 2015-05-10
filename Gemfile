@@ -2,6 +2,8 @@
 
 source 'https://rubygems.org'
 
+gem 'bosh_cli_plugin_multicloud', path: 'bosh_cli_plugin_multicloud'
+
 gem 'agent_client', path: 'agent_client'
 gem 'blobstore_client', path: 'blobstore_client'
 gem 'bosh_aws_cpi', path: 'bosh_aws_cpi'

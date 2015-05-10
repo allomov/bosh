@@ -584,6 +584,19 @@ module Bosh
           end
         end
 
+        def list_clouds
+          _, clouds = get_json_with_status('/clouds')
+          clouds.map do |c|  
+            Bosh::Cli::Cloud.new(
+              name: c['name'], 
+              type: c['type'],
+              endpoint: c['endpoint'],
+              properties: c["properties"],
+              created_at: c["created_at"])
+          end
+        end
+
+
         def update_cloud_config(cloud_config_yaml)
           status, _ = post('/cloud_configs', 'text/yaml', cloud_config_yaml)
           status == 201

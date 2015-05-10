@@ -12,6 +12,7 @@ module Bosh
           controllers = {}
           controllers['/backups'] = Bosh::Director::Api::Controllers::BackupsController.new(@config)
           controllers['/cloud_configs'] = Bosh::Director::Api::Controllers::CloudConfigsController.new(@config)
+          controllers['/clouds'] = Bosh::Director::Api::Controllers::MultiCloudController.new(@config)
           controllers['/compiled_package_groups'] = Bosh::Director::Api::Controllers::CompiledPackagesController.new(
             @config,
             Bosh::Director::Api::CompiledPackageGroupManager.new
