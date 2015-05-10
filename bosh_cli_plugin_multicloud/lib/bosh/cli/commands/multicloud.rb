@@ -24,7 +24,7 @@ module Bosh::Cli::Command
       clouds_table = table do |t|
         t.headings = ['Name', 'Type', 'Endpoint']
         clouds.each do |d|
-          t.add_row(row_for_deployments_table(d))
+          t.add_row(c.name, c.type, c.endpoint)
           t.add_separator unless d == clouds.last
         end
       end
