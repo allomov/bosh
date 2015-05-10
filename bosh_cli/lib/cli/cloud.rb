@@ -1,6 +1,6 @@
 module Bosh
   module Cli
-    class Cloud < Struct.new(:name, :type, :properties, :created_at)
+    class Cloud < Struct.new(:name, :type, :endpoint, :properties, :created_at)
       def initialize(attrs)
         self.name = attrs.fetch(:name)
         self.type = attrs.fetch(:type)
