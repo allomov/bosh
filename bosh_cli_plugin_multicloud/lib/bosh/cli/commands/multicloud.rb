@@ -25,9 +25,12 @@ module Bosh::Cli::Command
         t.headings = ['Name', 'Type', 'Endpoint']
         clouds.each do |c|
           t.add_row(c.name, c.type, c.endpoint)
-          t.add_separator unless d == clouds.last
+          t.add_separator unless c == clouds.last
         end
       end
+      nl
+      say(clouds_table)
+      nl
     end
 
     usage 'add cloud'
