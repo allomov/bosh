@@ -5,6 +5,11 @@ module Bosh::Director::Models
     one_to_many :stemcells
     many_to_many :deployments
 
+    def before_create
+      self.created_at ||= Time.now
+    end
+
+
     # def validate
     #   validates_presence [:state, :timestamp, :description]
     # end
