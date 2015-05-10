@@ -2,7 +2,7 @@ module Bosh
   module Director
     module Api
       class MultiCloudManager
-        def add(properties)
+        def create(properties)
           cloud_config = Bosh::Director::Api::CloudConfigManager.new.update(properties['properties'])
           cloud = Bosh::Director::Models::Cloud.new(
             name: properties['name'],
