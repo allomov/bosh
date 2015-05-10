@@ -9,7 +9,6 @@ module Bosh::Cli::Command
 
     def initialize(runner)
       super(runner)
-      options[:config] ||= DEFAULT_CONFIG_PATH # hijack Cli::Config
     end
 
     usage 'clouds'
