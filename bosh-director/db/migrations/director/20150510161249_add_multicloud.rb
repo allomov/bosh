@@ -8,8 +8,8 @@ Sequel.migration do
   up do
     create_table(:clouds) do
       primary_key :id
-      foreign_key :cloud_config_id, :cloud_configs, :null => false
-      foreign_key :deployment_id, :deployments, :null => false
+      foreign_key :cloud_config_id
+      foreign_key :deployment_id
 
       text :name
       text :type
