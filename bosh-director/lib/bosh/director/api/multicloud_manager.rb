@@ -3,7 +3,8 @@ module Bosh
     module Api
       class MultiCloudManager
         def create(properties)
-          cloud_config = Bosh::Director::Api::CloudConfigManager.new.update(properties['properties'])
+          cloud_config_properties = Psych.dump(properties['properties'])
+          cloud_config = Bosh::Director::Api::CloudConfigManager.new.update(cloud_config_properties)
           cloud = Bosh::Director::Models::Cloud.new(
             name: properties['name'],
             type: properties['type'],

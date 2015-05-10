@@ -5,7 +5,7 @@ module Bosh::Director
     class MultiCloudController < BaseController
 
       post '/', :consumes => :yaml do
-        properties = Psych.load(request.body)
+        manifest = Psych.load(request.body.string)
         Bosh::Director::Api::MultiCloudManager.new.create(properties)
         status(201)
       end
