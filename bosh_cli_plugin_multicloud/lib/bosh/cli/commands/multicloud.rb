@@ -14,18 +14,18 @@ module Bosh::Cli::Command
     usage 'clouds'
     desc 'show list of available clouds'
     def list
-      list = director.list_clouds
+      clouds = director.list_clouds
       
-      err('No Clouds Available.'.make_red) if list.empty?
+      err('No Clouds Available.'.make_red) if clouds.empty?
       
       say('Available Clouds:')
       nl
 
-      deployments_table = table do |t|
+      clouds_table = table do |t|
         t.headings = ['Name', 'Type', 'Endpoint']
-        deployments.each do |d|
+        clouds.each do |d|
           t.add_row(row_for_deployments_table(d))
-          t.add_separator unless d == deployments.last
+          t.add_separator unless d == clouds.last
         end
       end
     end
