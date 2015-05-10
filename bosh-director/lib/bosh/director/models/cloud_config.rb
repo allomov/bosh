@@ -2,6 +2,8 @@ module Bosh
   module Director
     module Models
       class CloudConfig < Sequel::Model(Bosh::Director::Config.db)
+        one_to_one :cloud
+
         def before_create
           self.created_at ||= Time.now
         end
