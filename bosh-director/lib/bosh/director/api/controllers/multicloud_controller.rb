@@ -18,6 +18,7 @@ module Bosh::Director
             {
               "name"       => cloud.name,
               "type"       => cloud.type,
+              "endpoint"   => cloud.endpoint,
               "properties" => cloud.cloud_config.properties,
               "created_at" => cloud.created_at,
             }
