@@ -17,9 +17,10 @@ module Bosh::Cli::Command
       clouds = director.list_clouds
       
       err('No Clouds Available.'.make_red) if clouds.empty?
-      
-      say('Available Clouds:')
+
       nl
+      say('Available Clouds:')
+      
 
       clouds_table = table do |t|
         t.headings = ['Name', 'Type', 'Endpoint']

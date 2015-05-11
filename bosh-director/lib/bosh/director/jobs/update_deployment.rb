@@ -26,7 +26,7 @@ module Bosh::Director
           @notifier = DeploymentPlan::Notifier.new(deployment_name, Config.nats_rpc, logger)
           @notifier.send_start_event
 
-          # cloud_config_model = Bosh::Director::Models::CloudConfig[@cloud_config_id]
+          cloud_config_model = Bosh::Director::Models::CloudConfig[@cloud_config_id]
           planner_factory = DeploymentPlan::PlannerFactory.create(event_log, logger)
           deployment_plan = planner_factory.planner(deployment_manifest_hash, cloud_config_model, @options)
 
