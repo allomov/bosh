@@ -24,7 +24,7 @@ module Bosh::Cli::Command
       clouds_table = table do |t|
         t.headings = ['Name', 'Type', 'Endpoint']
         clouds.each do |c|
-          t.add_row([c.name, c.type, c.endpoint])
+          t.add_row([c.name.make_green, c.type, c.endpoint])
           t.add_separator unless c == clouds.last
         end
       end
@@ -50,8 +50,9 @@ module Bosh::Cli::Command
 
     usage 'delete cloud'
     desc 'delete cloud'
-    def delete(name = nil)
-      
+    def delete(name)
+      auth_required
+      director.delete_cloud(name)
     end
 
 

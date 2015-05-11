@@ -602,6 +602,10 @@ module Bosh
           status == 201
         end
 
+        def delete_cloud(name)
+          delete("/clouds/#{name}")
+        end
+
 
         def update_cloud_config(cloud_config_yaml)
           status, _ = post('/cloud_configs', 'text/yaml', cloud_config_yaml)

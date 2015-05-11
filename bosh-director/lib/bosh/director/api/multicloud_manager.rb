@@ -17,8 +17,8 @@ module Bosh
           cloud_config.save
         end
 
-        def delete(cloud_id)
-          cloud = Bosh::Director::Models::Cloud[instance_id]
+        def delete(name)
+          cloud = Bosh::Director::Models::Cloud.first(:name => name)
           cloud.delete
         end
 

@@ -25,8 +25,8 @@ module Bosh::Director
         )
       end
 
-      delete '/:id' do |id|
-        Bosh::Director::Api::MultiCloudManager.new.delete(id)
+      delete '/:name' do |name|
+        Bosh::Director::Api::MultiCloudManager.new.delete(name)
         status(201)
       end
 
