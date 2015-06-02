@@ -5,6 +5,10 @@ module Bosh
   module OpenStackCloud; end
 end
 
+# see PR #834 for details about this lines
+require "fog/aws/credential_fetcher"
+require "fog/aws/region_methods"
+
 require "fog"
 require "httpclient"
 require "json"
