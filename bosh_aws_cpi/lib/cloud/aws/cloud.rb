@@ -205,14 +205,20 @@ module Bosh::AwsCloud
 
         logger.info("Deleting volume `#{volume.id}'")
 
-        tries = 10
-        sleep_cb = ResourceWait.sleep_callback("Waiting for volume `#{volume.id}' to be deleted", tries)
+        # Retry 1, 6, 11, 15, 15, 15.. seconds. The total time is ~10 min.
+        # VolumeInUse can be returned by AWS if disk was attached to VM
+        # that was recently removed.
+        tries = ResourceWait::DEFAULT_WAIT_ATTEMPTS
+        sleep_cb = ResourceWait.sleep_callback(
+          "Waiting for volume `#{volume.id}' to be deleted",
+          { interval: 5, total: tries }
+        )
         ensure_cb = Proc.new do |retries|
           cloud_error("Timed out waiting to delete volume `#{volume.id}'") if retries == tries
         end
-        error = AWS::EC2::Errors::Client::VolumeInUse
+        errors = [AWS::EC2::Errors::VolumeInUse, AWS::EC2::Errors::RequestLimitExceeded]
 
-        Bosh::Common.retryable(tries: tries, sleep: sleep_cb, on: error, ensure: ensure_cb) do
+        Bosh::Common.retryable(tries: tries, sleep: sleep_cb, on: errors, ensure: ensure_cb) do
           volume.delete
           true # return true to only retry on Exceptions
         end
@@ -484,7 +490,6 @@ module Bosh::AwsCloud
       cloud_error("Cannot find EBS volume on current instance")
     end
 
-
     private
 
     attr_reader :az_selector
@@ -573,11 +578,35 @@ module Bosh::AwsCloud
       # AWS might still lie and say that the disk isn't ready yet, so
       # we try again just to be really sure it is telling the truth
       attachment = nil
-      Bosh::Common.retryable(tries: 15, on: AWS::EC2::Errors::IncorrectState) do
+
+      logger.debug("Attaching '#{volume.id}' to '#{instance.id}' as '#{device_name}'")
+
+      # Retry every 1 sec for 15 sec, then every 15 sec for ~10 min
+      # VolumeInUse can be returned by AWS if disk was attached to VM
+      # that was recently removed.
+      tries = ResourceWait::DEFAULT_WAIT_ATTEMPTS
+      sleep_cb = ResourceWait.sleep_callback(
+        "Attaching volume `#{volume.id}' to #{instance.id}",
+        { interval: 0, tries_before_max: 15, total: tries }
+      )
+
+      Bosh::Common.retryable(
+        on: [
+          AWS::EC2::Errors::IncorrectState,
+          AWS::EC2::Errors::VolumeInUse,
+          AWS::EC2::Errors::RequestLimitExceeded
+        ],
+        sleep: sleep_cb,
+        tries: tries
+      ) do |retries, error|
+        # Continue to retry after 15 attempts only for VolumeInUse
+        if retries > 15 && error.instance_of?(AWS::EC2::Errors::IncorrectState)
+          cloud_error("Failed to attach disk: #{error.message}")
+        end
+
         attachment = volume.attach_to(instance, device_name)
       end
 
-      logger.info("Attaching '#{volume.id}' to '#{instance.id}' as '#{device_name}'")
       ResourceWait.for_attachment(attachment: attachment, state: :attached)
 
       device_name = attachment.device

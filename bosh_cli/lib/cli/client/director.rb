@@ -1,6 +1,6 @@
-# Copyright (c) 2009-2012 VMware, Inc.
 require 'cli/core_ext'
 require 'cli/errors'
+require 'cli/cloud_config'
 
 require 'json'
 require 'httpclient'
@@ -529,11 +529,6 @@ module Bosh
           get_json('/locks')
         end
 
-        [:post, :put, :get, :delete].each do |method_name|
-          define_method method_name do |*args|
-            request(method_name, *args)
-          end
-        end
 
         # Perform director HTTP request and track director task (if request
         # started one).
@@ -576,6 +571,38 @@ module Bosh
           request_and_track(method, uri, options.merge(:payload => file))
         ensure
           file.stop_progress_bar if file
+        end
+
+        def get_cloud_config
+          _, cloud_configs = get_json_with_status('/cloud_configs?limit=1')
+          latest = cloud_configs.first
+
+          if !latest.nil?
+            Bosh::Cli::CloudConfig.new(
+              properties: latest["properties"],
+              created_at: latest["created_at"])
+          end
+        end
+
+        def update_cloud_config(cloud_config_yaml)
+          status, _ = post('/cloud_configs', 'text/yaml', cloud_config_yaml)
+          status == 201
+        end
+
+        def post(uri, content_type = nil, payload = nil, headers = {}, options = {})
+          request(:post, uri, content_type, payload, headers, options)
+        end
+
+        def put(uri, content_type = nil, payload = nil, headers = {}, options = {})
+          request(:put, uri, content_type, payload, headers, options)
+        end
+
+        def get(uri, content_type = nil, payload = nil, headers = {}, options = {})
+          request(:get, uri, content_type, payload, headers, options)
+        end
+
+        def delete(uri, content_type = nil, payload = nil, headers = {}, options = {})
+          request(:delete, uri, content_type, payload, headers, options)
         end
 
         private

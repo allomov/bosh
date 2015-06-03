@@ -1,6 +1,9 @@
 require 'spec_helper'
 
 describe 'Ubuntu 14.04 stemcell', stemcell_image: true do
+
+  it_behaves_like 'All Stemcells'
+
   context 'installed by image_install_grub', exclude_on_warden: true do
     if (RbConfig::CONFIG['host_cpu'] == "powerpc64le")
       describe file('/boot/grub/grub.cfg') do

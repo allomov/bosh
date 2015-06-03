@@ -50,10 +50,7 @@ describe Bosh::AwsCloud::Cloud do
     ).instances.tagged('delete_me').each(&:terminate)
   end
 
-  before do
-    Bosh::Clouds::Config.configure(
-      double('delegate', task_checkpoint: nil, logger: Logger.new(STDOUT)))
-  end
+  before { Bosh::Clouds::Config.configure(double('delegate', task_checkpoint: nil)) }
 
   before { allow(Bosh::Clouds::Config).to receive_messages(logger: logger) }
   let(:logger) { Logger.new(STDERR) }
@@ -160,6 +157,50 @@ describe Bosh::AwsCloud::Cloud do
             cpi.detach_disk(instance_id, volume_id)
             true
           end
+        end
+      end
+    end
+
+    context 'when vm with attached disk is removed' do
+      it 'should wait for 10 mins to attach disk/delete disk ignoring VolumeInUse error' do
+        begin
+          disk_id = cpi.create_disk(2048, {})
+
+          stemcell_id = cpi.create_stemcell('/not/a/real/path', {'ami' => {'us-east-1' => ami}})
+          vm_id = cpi.create_vm(
+            nil,
+            stemcell_id,
+            resource_pool,
+            network_spec,
+            [disk_id],
+            nil,
+          )
+
+          cpi.attach_disk(vm_id, disk_id)
+          expect(cpi.get_disks(vm_id)).to include(disk_id)
+
+          cpi.delete_vm(vm_id)
+          vm_id = nil
+
+          new_vm_id = cpi.create_vm(
+            nil,
+            stemcell_id,
+            resource_pool,
+            network_spec,
+            [disk_id],
+            nil,
+          )
+
+          expect {
+            cpi.attach_disk(new_vm_id, disk_id)
+          }.to_not raise_error
+
+          expect(cpi.get_disks(new_vm_id)).to include(disk_id)
+        ensure
+          cpi.delete_vm(new_vm_id) if new_vm_id
+          cpi.delete_disk(disk_id) if disk_id
+          cpi.delete_stemcell(stemcell_id) if stemcell_id
+          cpi.delete_vm(vm_id) if vm_id
         end
       end
     end
