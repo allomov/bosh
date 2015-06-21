@@ -26,26 +26,14 @@ module Bosh::Stemcell
       ]
     end
 
-    if (RbConfig::CONFIG['host_cpu'] == "powerpc64le")
-      def agent_stages
-        [
-          :bosh_ruby,
-          :bosh_go_agent,
-          :bosh_micro_go,  # bosh-agent is crashing during stemcell creation
-          :aws_cli,
-          :logrotate_config,
-        ]
-      end
-    else 
-      def agent_stages
-        [
-          :bosh_ruby,
-          :bosh_go_agent,
-          :bosh_micro_go,
-          :aws_cli,
-          :logrotate_config,
-        ]
-      end
+    def agent_stages
+      [
+        :bosh_ruby,
+        :bosh_go_agent,
+        # :bosh_micro_go,  # bosh-agent is crashing during stemcell creation
+        :aws_cli,
+        :logrotate_config,
+      ]
     end
 
     def build_stemcell_image_stages

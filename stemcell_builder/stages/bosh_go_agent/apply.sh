@@ -22,23 +22,28 @@ ln -s /etc/sv/monit /etc/service/monit
 # Alerts for monit config
 cp -a $dir/assets/alerts.monitrc $chroot/var/vcap/monit/alerts.monitrc
 
-cd $assets_dir/go/src/github.com/cloudfoundry/bosh-agent
+agent_dir=$assets_dir/go/src/github.com/cloudfoundry/bosh-agent
 
+cd $agent_dir
 bin/build
-
 mv out/bosh-agent $chroot/var/vcap/bosh/bin/
+
 if [ `uname -m` == "ppc64le" ]; then
    # assume that gccgo is installed under /usr/local/gccgp
    cp -rvH /usr/local/gccgo $chroot/var/vcap/bosh/
 fi
 
 cp Tools/bosh-agent-rc $chroot/var/vcap/bosh/bin/
+
+cd $assets_dir/go/src/github.com/cloudfoundry/bosh-davcli
+bin/build
 mv out/dav-cli $chroot/var/vcap/bosh/bin/bosh-blobstore-dav
+
 chmod +x $chroot/var/vcap/bosh/bin/bosh-agent
 chmod +x $chroot/var/vcap/bosh/bin/bosh-agent-rc
 chmod +x $chroot/var/vcap/bosh/bin/bosh-blobstore-dav
 
-cp mbus/agent.{cert,key} $chroot/var/vcap/bosh/
+cp $agent_dir/mbus/agent.{cert,key} $chroot/var/vcap/bosh/
 
 # Setup additional permissions
 run_in_chroot $chroot "
@@ -62,3 +67,4 @@ echo '{}' > $chroot/var/vcap/bosh/agent.json
 
 # We need to capture ssh events
 cp $dir/assets/rsyslog.d/10-auth_agent_forwarder.conf $chroot/etc/rsyslog.d/10-auth_agent_forwarder.conf
+
