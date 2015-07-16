@@ -19,6 +19,11 @@ EOF
 
 $bundle_cmd config build.mysql2 --with-mysql-dir=$mysqlclient_dir --with-mysql-include=$mysqlclient_dir/include/mysql
 $bundle_cmd config build.pg --with-pg-lib=$libpq_dir/lib --with-pg-include=$libpq_dir/include
+
+if [ "`uname -m`" == "ppc64le" ]; then
+  $bundle_cmd config build.nokogiri --use-system-libraries
+fi
+
 $bundle_cmd install --local --no-prune \
     --binstubs ${BOSH_INSTALL_TARGET}/bin \
     --path ${BOSH_INSTALL_TARGET}/gem_home
