@@ -14,17 +14,26 @@ fi
 
 echo -n $stemcell_infrastructure > $chroot/var/vcap/bosh/etc/infrastructure
 
-# Temporary workaround: if we are building a RHEL stemcell, tell the BOSH agent
+# Temporary workaround: if we are building a RHEL and Photon stemcell, tell the BOSH agent
 # it's a CentOS machine. This is required because the current version of bosh-agent
-# does not recognize the OS type "rhel".
+# does not recognize the OS type "rhel" and "photon".
 #
 # This workaround should be reverted once we can go back to the latest version of
 # the bosh-agent submodule. See
 os="${stemcell_operating_system}"
-if [ "${os}" == "rhel" ]; then
+if [ "${os}" == "rhel" ] || [ "${os}" == "photon" ] ; then
   os="centos"
 fi
 
 echo -n ${os} > $chroot/var/vcap/bosh/etc/operating_system
 
 echo -n ${stemcell_version} > $chroot/var/vcap/bosh/etc/stemcell_version
+
+pushd /bosh
+has_uncommitted_changes=""
+if ! git diff --quiet --exit-code; then
+  has_uncommitted_changes="+"
+fi
+
+echo -n $(git rev-parse HEAD)${has_uncommitted_changes} > $chroot/var/vcap/bosh/etc/stemcell_git_sha1
+popd

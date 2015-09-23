@@ -1,26 +1,30 @@
 module Bosh::Cli
   class VmState
-    def initialize(command, force)
+    def initialize(command, manifest, force)
       @command = command
+      @manifest = manifest
       @force = force
     end
 
-    def change(job, index, new_state, operation_desc)
+    def change(job, index, new_state, operation_desc, options = {})
       command.say("You are about to #{operation_desc.make_green}")
-      manifest = command.prepare_deployment_manifest
-      manifest_yaml = Psych.dump(manifest)
 
-      if command.interactive?
-        check_if_manifest_changed(manifest)
+      check_if_manifest_changed(@manifest.hash)
 
-        unless command.confirmed?("#{operation_desc.capitalize}?")
-          command.cancel_deployment
-        end
+      unless command.confirmed?("#{operation_desc.capitalize}?")
+        command.cancel_deployment
       end
 
       command.nl
       command.say("Performing `#{operation_desc}'...")
-      command.director.change_job_state(manifest['name'], manifest_yaml, job, index, new_state)
+      command.director.change_job_state(
+        @manifest.name,
+        @manifest.yaml,
+        job,
+        index,
+        new_state,
+        options
+      )
     end
 
     private
@@ -30,13 +34,11 @@ module Bosh::Cli
       !!@force
     end
 
-    def check_if_manifest_changed(manifest)
-      other_changes_present = command.inspect_deployment_changes(
-          manifest, show_empty_changeset: false)
+    def check_if_manifest_changed(manifest_hash)
+      other_changes_present = command.inspect_deployment_changes(manifest_hash, show_empty_changeset: false)
 
       if other_changes_present && !force?
-        command.err('Cannot perform job management when other deployment changes ' +
-                        "are present. Please use `--force' to override.")
+        command.err("Cannot perform job management when other deployment changes are present. Please use `--force' to override.")
       end
     end
   end

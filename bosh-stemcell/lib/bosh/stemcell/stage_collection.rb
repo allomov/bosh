@@ -18,6 +18,8 @@ module Bosh::Stemcell
           rhel_os_stages
         when OperatingSystem::Ubuntu then
           ubuntu_os_stages
+        when OperatingSystem::Photon then
+          photon_os_stages
       end
     end
 
@@ -38,7 +40,7 @@ module Bosh::Stemcell
     end
 
     def build_stemcell_image_stages
-      case infrastructure
+      stages = case infrastructure
       when Infrastructure::Aws then
         aws_stages
       when Infrastructure::OpenStack then
@@ -50,6 +52,8 @@ module Bosh::Stemcell
       when Infrastructure::Warden then
         warden_stages
       end
+
+      stages.concat(finish_stemcell_stages)
     end
 
     def package_stemcell_stages(disk_format)
@@ -80,6 +84,7 @@ module Bosh::Stemcell
           :bosh_harden,
           :bosh_disable_password_authentication,
           :bosh_openstack_agent_settings,
+          :disable_blank_passwords,
           :image_create,
           :image_install_grub,
         ]
@@ -95,6 +100,7 @@ module Bosh::Stemcell
           :bosh_harden,
           :bosh_disable_password_authentication,
           :bosh_openstack_agent_settings,
+          :disable_blank_passwords,
           # Image/bootloader
           :image_create,
           :image_install_grub,
@@ -102,15 +108,23 @@ module Bosh::Stemcell
       end
     end
 
+    def finish_stemcell_stages
+      [
+        :bosh_package_list
+      ]
+    end
+
     def vsphere_stages
       if is_centos?
         [
           :system_network,
+          :system_open_vm_tools,
           :system_vsphere_cdrom,
           :system_parameters,
           :bosh_clean,
           :bosh_harden,
           :bosh_vsphere_agent_settings,
+          :disable_blank_passwords,
           :image_create,
           :image_install_grub,
         ]
@@ -125,6 +139,7 @@ module Bosh::Stemcell
           :bosh_clean,
           :bosh_harden,
           :bosh_vsphere_agent_settings,
+          :disable_blank_passwords,
           # Image/bootloader
           :image_create,
           :image_install_grub,
@@ -136,11 +151,13 @@ module Bosh::Stemcell
       if is_centos?
         [
           :system_network,
+          :system_open_vm_tools,
           :system_vsphere_cdrom,
           :system_parameters,
           :bosh_clean,
           :bosh_harden,
           :bosh_vsphere_agent_settings,
+          :disable_blank_passwords,
           :image_create,
           :image_install_grub,
         ]
@@ -155,6 +172,7 @@ module Bosh::Stemcell
           :bosh_clean,
           :bosh_harden,
           :bosh_vsphere_agent_settings,
+          :disable_blank_passwords,
           # Image/bootloader
           :image_create,
           :image_install_grub,
@@ -173,6 +191,7 @@ module Bosh::Stemcell
         :bosh_harden,
         :bosh_disable_password_authentication,
         :bosh_aws_agent_settings,
+        :disable_blank_passwords,
         # Image/bootloader
         :image_create,
         :image_install_grub,
@@ -193,29 +212,29 @@ module Bosh::Stemcell
     end
 
     def centos_os_stages
-      os_stages = [
-          :base_centos,
-          :base_centos_packages,
-          :base_ssh,
-          bosh_steps,
-          :rsyslog_config,
-          :delay_monit_start,
-          :system_grub,
-          :cron_config,
+     [
+        :base_centos,
+        :base_centos_packages,
+        :base_file_permission,
+        :base_ssh,
+        :system_kernel_modules,
+        :system_ixgbevf,
+        bosh_steps,
+        :rsyslog_config,
+        :delay_monit_start,
+        :system_grub,
+        :cron_config,
+        :escape_ctrl_alt_del
       ].flatten
-
-      if operating_system.version.to_f < 7
-        os_stages.insert(os_stages.index(:rsyslog_config),:rsyslog_build)
-      end
-
-      os_stages
     end
 
     def rhel_os_stages
       [
         :base_rhel,
         :base_centos_packages,
+        :base_file_permission,
         :base_ssh,
+        :system_kernel_modules,
         bosh_steps,
         :rsyslog_config,
         :delay_monit_start,
@@ -232,16 +251,31 @@ module Bosh::Stemcell
         :base_apt,
         :base_ubuntu_build_essential,
         :base_ubuntu_packages,
+        :base_file_permission,
         :base_ssh,
-        :bosh_dpkg_list,
         :bosh_sysstat,
         :system_kernel,
+        :system_kernel_modules,
+        :system_ixgbevf,
         bosh_steps,
-        :rsyslog_build,
         :rsyslog_config,
         :delay_monit_start,
         :system_grub,
         :vim_tiny,
+        :cron_config,
+        :escape_ctrl_alt_del,
+      ].flatten
+    end
+
+    def photon_os_stages
+      [
+        :base_photon,
+        :base_file_permission,
+        bosh_steps,
+        :base_ssh,
+        :rsyslog_config,
+        :delay_monit_start,
+        :system_grub,
         :cron_config,
       ].flatten
     end

@@ -4,6 +4,12 @@ module Bosh::Dev
   class GitBranchMerger
     include CommandHelper
 
+    def self.build
+      new(
+        Logging.logger(STDERR),
+      )
+    end
+
     def initialize(logger)
       @logger = logger
     end
@@ -39,6 +45,14 @@ module Bosh::Dev
       # the currently checked out branch is prefixed with a star
       branches = branches.map{ |line| line.sub(/^\* /, '') }
       branches.include?(branch_name)
+    end
+
+    def sha_does_not_include_latest_master?(candidate_sha)
+      latest_sha, stderr, status = exec_cmd('git rev-parse origin/master')
+      raise "Failed fetching branch master: stdout: '#{stdout}', stderr: '#{stderr}'" unless status.success?
+
+      _, _, status = exec_cmd("git log #{candidate_sha} | grep #{latest_sha.strip}")
+      !status.success?
     end
   end
 end

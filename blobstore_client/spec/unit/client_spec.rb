@@ -17,10 +17,6 @@ module Bosh::Blobstore
           expect(Client.create('simple', {})).to be_instance_of(SimpleBlobstoreClient)
         end
 
-        it 'returns atmos client' do
-          expect(Client.create('atmos', {})).to be_instance_of(AtmosBlobstoreClient)
-        end
-
         it 'returns s3 client' do
           expect(Client.create('s3', {
             access_key_id: 'foo',
@@ -88,7 +84,7 @@ module Bosh::Blobstore
         it 'makes retryable object with default options' do
           expect(Bosh::Retryable)
             .to receive(:new)
-            .with(tries: 3, sleep: 0.5, on: [BlobstoreError])
+            .with(tries: 6, sleep: 2.0, on: [BlobstoreError])
             .and_call_original
           described_class.safe_create('simple', {})
         end

@@ -23,8 +23,9 @@ describe Bosh::Cli::Command::LogManagement do
     allow(command).to receive_messages(target: 'http://bosh.example.com')
     allow(command).to receive_messages(logged_in?: true)
     allow(command).to receive_messages(director: director)
-    allow(command).to receive_messages(prepare_deployment_manifest: manifest)
+    allow(command).to receive_messages(prepare_deployment_manifest: double(:manifest, hash: manifest, name: 'mycloud'))
     allow(command).to receive(:say)
+    allow(command).to receive(:show_current_state)
     allow(director).to receive_messages(fetch_logs: 'resource-id', download_resource: '/tmp/resource')
   end
 
@@ -87,10 +88,10 @@ describe Bosh::Cli::Command::LogManagement do
             command.fetch_logs(job, index)
           end
 
-          it 'successfully retrieves the log resource id with filters' do
+          it 'ignores the --all option' do
             command.options[:all] = true
 
-            expect(director).to receive(:fetch_logs).with(deployment, job, index, 'agent', 'all').and_return('resource_id')
+            expect(director).to receive(:fetch_logs).with(deployment, job, index, 'agent', nil).and_return('resource_id')
             command.fetch_logs(job, index)
           end
         end
@@ -103,10 +104,17 @@ describe Bosh::Cli::Command::LogManagement do
             command.fetch_logs(job, index)
           end
 
-          it 'successfully retrieves the log resource id with all filters' do
+          it 'ignores the --all option' do
             command.options[:all] = true
 
-            expect(director).to receive(:fetch_logs).with(deployment, job, index, 'job', 'all').and_return('resource_id')
+            expect(director).to receive(:fetch_logs).with(deployment, job, index, 'job', nil).and_return('resource_id')
+            command.fetch_logs(job, index)
+          end
+
+          it 'prints deprecation warning about the --all option' do
+            command.options[:all] = true
+
+            expect(command).to receive(:say).with('Warning: --all flag is deprecated and has no effect.')
             command.fetch_logs(job, index)
           end
 

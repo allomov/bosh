@@ -12,7 +12,7 @@ module Bosh
     module Client
       class Director
 
-        DIRECTOR_HTTP_ERROR_CODES = [400, 403, 404, 500]
+        DIRECTOR_HTTP_ERROR_CODES = [400, 401, 403, 404, 500]
 
         API_TIMEOUT     = 86400 * 3
         CONNECT_TIMEOUT = 30
@@ -137,8 +137,28 @@ module Bosh
           get_json("/releases/#{name}")
         end
 
+        def inspect_release(name, version)
+          url = "/releases/#{name}"
+
+          extras = []
+          extras << ['version', version]
+
+          get_json(add_query_string(url, extras))
+        end
+
         def match_packages(manifest_yaml)
           url          = '/packages/matches'
+          status, body = post(url, 'text/yaml', manifest_yaml)
+
+          if status == 200
+            JSON.parse(body)
+          else
+            err(parse_error_message(status, body))
+          end
+        end
+
+        def match_compiled_packages(manifest_yaml)
+          url          = '/packages/matches_compiled'
           status, body = post(url, 'text/yaml', manifest_yaml)
 
           if status == 200
@@ -216,13 +236,15 @@ module Bosh
           options = options.dup
 
           recreate               = options.delete(:recreate)
+          skip_drain             = options.delete(:skip_drain)
           options[:content_type] = 'text/yaml'
           options[:payload]      = manifest_yaml
 
           url = '/deployments'
 
           extras = []
-          extras << ['recreate', 'true'] if recreate
+          extras << ['recreate', 'true']   if recreate
+          extras << ['skip_drain', skip_drain] if skip_drain
 
           request_and_track(:post, add_query_string(url, extras), options)
         end
@@ -278,9 +300,12 @@ module Bosh
           job_name, index, new_state, options = {})
           options = options.dup
 
+          skip_drain = !!options.delete(:skip_drain)
+
           url = "/deployments/#{deployment_name}/jobs/#{job_name}"
           url += "/#{index}" if index
           url += "?state=#{new_state}"
+          url += "&skip_drain=true" if skip_drain
 
           options[:payload]      = manifest_yaml
           options[:content_type] = 'text/yaml'
@@ -621,6 +646,7 @@ module Bosh
         def request(method, uri, content_type = nil, payload = nil, headers = {}, options = {})
           headers = headers.dup
           headers['Content-Type'] = content_type if content_type
+          headers['Host'] = @director_uri.host
 
           tmp_file = nil
           response_reader = nil
@@ -722,7 +748,8 @@ module Bosh
                Timeout::Error,
                HTTPClient::TimeoutError,
                HTTPClient::KeepAliveDisconnected,
-               OpenSSL::SSL::SSLError => e
+               OpenSSL::SSL::SSLError,
+               OpenSSL::X509::StoreError => e
           raise DirectorInaccessible, "cannot access director (#{e.message})"
 
         rescue HTTPClient::BadResponseError => e

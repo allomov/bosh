@@ -79,10 +79,9 @@ GRUB_CMDLINE_LINUX="vconsole.keymap=us net.ifnames=0 crashkernel=auto selinux=0 
 EOF
 
   # assemble config file that is read by grub2 at boot time
-  run_in_chroot ${image_mount_point} "grub2-mkconfig -o /boot/grub2/grub.cfg"
+  run_in_chroot ${image_mount_point} "GRUB_DISABLE_RECOVERY=true grub2-mkconfig -o /boot/grub2/grub.cfg"
 
   rm ${image_mount_point}/device.map
-
 else # Classic GRUB
 
   mkdir -p ${image_mount_point}/tmp/grub
@@ -124,6 +123,14 @@ then
 # /etc/fstab Created by BOSH Stemcell Builder
 UUID=${uuid} / ext4 defaults 1 1
 FSTAB
+elif [ -f ${image_mount_point}/etc/photon-release ] # Photon
+then
+  initrd_file="initramfs-${kernel_version}.img"
+  os_name=$(cat ${image_mount_point}/etc/photon-release)
+  cat > ${image_mount_point}/etc/fstab <<FSTAB
+# /etc/fstab Created by BOSH Stemcell Builder
+UUID=${uuid} / ext4 defaults 1 1
+FSTAB
 else
   echo "Unknown OS, exiting"
   exit 2
@@ -139,26 +146,29 @@ title ${os_name} (${kernel_version})
   kernel /boot/vmlinuz-${kernel_version} ro root=UUID=${uuid} selinux=0 cgroup_enable=memory swapaccount=1 console=tty0 console=ttyS0,115200n8
   initrd /boot/${initrd_file}
 GRUB_CONF
+
 elif [ -f ${image_mount_point}/etc/redhat-release ] # Centos or RHEL
 then
-
-# For CentOS 6 (Linux 2.x), we need to set xen_blkfront.sda_is_xvda=1 to force CentOS to have device mapping consistent
-# with Ubuntu. For CentOS 7 (Linux 3.x), we must not use this parameter because it prevents the system from booting.
-version_specific_params=""
-if [ ${kernel_version:0:1} = 2 ]; then
-  version_specific_params="xen_blkfront.sda_is_xvda=1"
-elif [ ${kernel_version:0:1} = 3 ]; then
-  version_specific_params="net.ifnames=0 plymouth.enable=0"
-fi
-
-cat > ${image_mount_point}/boot/grub/grub.conf <<GRUB_CONF
+  cat > ${image_mount_point}/boot/grub/grub.conf <<GRUB_CONF
 default=0
 timeout=1
 title ${os_name} (${kernel_version})
   root (hd0,0)
-  kernel /boot/vmlinuz-${kernel_version} ro root=UUID=${uuid} ${version_specific_params} selinux=0 console=tty0 console=ttyS0,115200n8
+  kernel /boot/vmlinuz-${kernel_version} ro root=UUID=${uuid} net.ifnames=0 plymouth.enable=0 selinux=0 console=tty0 console=ttyS0,115200n8
   initrd /boot/${initrd_file}
 GRUB_CONF
+
+elif [ -f ${image_mount_point}/etc/photon-release ] # Photon
+then
+  cat > ${image_mount_point}/boot/grub/grub.conf <<GRUB_CONF
+default=0
+timeout=1
+title ${os_name} (${kernel_version})
+  root (hd0,0)
+  kernel /boot/vmlinuz-${kernel_version} ro root=UUID=${uuid} net.ifnames=0 plymouth.enable=0 selinux=0 console=tty0 console=ttyS0,115200n8
+  initrd /boot/${initrd_file}
+GRUB_CONF
+
 else
   echo "Unknown OS, exiting"
   exit 2

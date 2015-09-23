@@ -3,10 +3,12 @@ require 'spec_helper'
 require 'cli'
 
 describe Bosh::Cli::Command::JobManagement do
+  include FakeFS::SpecHelpers
+
   let(:command) { described_class.new }
   let(:deployment) { 'dep1' }
   let(:manifest_yaml) { Psych.dump(deployment_manifest) }
-  let(:director) { instance_double('Bosh::Cli::Client::Director') }
+  let(:director) { instance_double('Bosh::Cli::Client::Director', uuid: 'fake-uuid') }
 
   before(:each) do
     allow(director).to receive(:change_job_state).and_return(:done, nil, '')
@@ -16,13 +18,18 @@ describe Bosh::Cli::Command::JobManagement do
     allow(command).to receive(:nl)
     allow(command).to receive_messages(confirmed?: true)
     allow(command).to receive(:director).and_return(director)
-    allow(command).to receive(:prepare_deployment_manifest).and_return(deployment_manifest)
-    allow(command).to receive(:prepare_deployment_manifest).with(yaml: true).and_return(manifest_yaml)
+
+    allow(command).to receive(:deployment).and_return('fake-deployment')
+    File.open('fake-deployment', 'w') { |f| f.write(deployment_manifest.to_yaml) }
+
+    allow(command).to receive(:show_current_state)
   end
 
   let(:deployment_manifest) do
     {
         'name' => deployment,
+        'director_uuid' => 'fake-uuid',
+        'releases' => [],
         'jobs' => [
             {
                 'name' => 'dea',
@@ -136,7 +143,7 @@ describe Bosh::Cli::Command::JobManagement do
 
         context 'if an index is supplied' do
           it 'changes the job state' do
-            expect(director).to receive(:change_job_state).with(deployment, manifest_yaml, 'dea', '0', new_state)
+            expect(director).to receive(:change_job_state).with(deployment, manifest_yaml, 'dea', '0', new_state, { skip_drain: false })
             command.public_send(method_name, 'dea', '0')
           end
 
@@ -150,7 +157,7 @@ describe Bosh::Cli::Command::JobManagement do
         context 'if an index is not supplied' do
           it 'changes the job state' do
             if instance_count == 1
-              expect(director).to receive(:change_job_state).with(deployment, manifest_yaml, 'dea', '0', new_state)
+              expect(director).to receive(:change_job_state).with(deployment, manifest_yaml, 'dea', '0', new_state, { skip_drain: false })
               command.public_send(method_name, 'dea')
             else
               expect {
@@ -175,6 +182,19 @@ describe Bosh::Cli::Command::JobManagement do
     end
   end
 
+  shared_examples :skips_drain do |options|
+    method_name = options.fetch(:with)
+
+    before { command.options[:skip_drain] = true }
+
+    context 'when skip-drain is specified' do
+      it 'passes it to director request' do
+        expect(director).to receive(:change_job_state).with(deployment, manifest_yaml, 'dea', '0', anything, { skip_drain: true })
+        command.public_send(method_name, 'dea', '0')
+      end
+    end
+  end
+
   context 'if there is only one job of the specified type in the deployment' do
     let(:instance_count) { 1 }
 
@@ -192,6 +212,8 @@ describe Bosh::Cli::Command::JobManagement do
                       verb: 'stop', past_verb: 'detached',
                       extra_task_report_info: ', VM(s) powered off',
                       operation_description_extra: ' and power off its VM(s)'
+
+      it_behaves_like :skips_drain, with: :stop_job
     end
 
     describe 'stop a job' do
@@ -201,16 +223,20 @@ describe Bosh::Cli::Command::JobManagement do
 
       it_behaves_like 'a command which modifies the vm state', with: :stop_job,
                       verb: 'stop', past_verb: 'stopped', extra_task_report_info: ', VM(s) still running'
+
+      it_behaves_like :skips_drain, with: :stop_job
     end
 
     describe 'restart a job' do
       it_behaves_like 'a command which modifies the vm state', with: :restart_job,
                       verb: 'restart', past_verb: 'restarted', extra_task_report_info: '', new_state: 'restart'
+      it_behaves_like :skips_drain, with: :restart_job
     end
 
     describe 'recreate a job' do
       it_behaves_like 'a command which modifies the vm state', with: :recreate_job,
                       verb: 'recreate', past_verb: 'recreated', extra_task_report_info: '', new_state: 'recreate'
+      it_behaves_like :skips_drain, with: :restart_job
     end
   end
 
@@ -250,6 +276,15 @@ describe Bosh::Cli::Command::JobManagement do
     describe 'recreate a job' do
       it_behaves_like 'a command which modifies the vm state', with: :recreate_job,
                       verb: 'recreate', past_verb: 'recreated', extra_task_report_info: '', new_state: 'recreate'
+    end
+  end
+
+  context 'if the job is not supplied in the command' do
+    let(:instance_count) { 1 }
+    it 'displays an error about the missing argument' do
+      expect {
+        command.public_send(:stop_job)
+      }.to raise_error(ArgumentError)
     end
   end
 end

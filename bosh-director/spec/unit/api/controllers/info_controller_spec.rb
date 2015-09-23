@@ -6,7 +6,7 @@ module Bosh::Director
     describe Controllers::InfoController do
       include Rack::Test::Methods
 
-      subject(:app) { described_class.new(Config.new(test_config)) }
+      subject(:app) { described_class.new(config) }
 
       let(:temp_dir) { Dir.mktmpdir}
       let(:base_config) do
@@ -23,8 +23,9 @@ module Bosh::Director
         config
       end
       let(:test_config) { base_config }
+      let(:config) { Config.load_hash(test_config) }
 
-      before { App.new(Config.load_hash(test_config)) }
+      before { App.new(config) }
 
       after { FileUtils.rm_rf(temp_dir) }
 
@@ -115,7 +116,7 @@ module Bosh::Director
 
       context 'when configured to use UAA for user management' do
         let(:test_config) { base_config.merge(
-          'user_management' => {'provider' => 'uaa', 'options' => {
+          'user_management' => {'provider' => 'uaa', 'uaa' => {
             'url' => 'http://localhost:8080/uaa',
             'key' => 'super secret!',
           }}

@@ -23,7 +23,7 @@ module Bosh::Cli::Command
       end
 
       unless manifest["target"].blank?
-        err(manifest_target_upgrade_notice)
+        err(Bosh::Cli::Manifest::MANIFEST_TARGET_UPGRADE_NOTICE)
       end
 
       if manifest["director_uuid"].blank?
@@ -79,44 +79,54 @@ module Bosh::Cli::Command
     # bosh deploy
     usage "deploy"
     desc "Deploy according to the currently selected deployment manifest"
-    option "--recreate", "recreate all VMs in deployment"
-    option "--redact-diff", "redact manifest value changes in deployment"
+    option "--recreate", "Recreate all VMs in deployment"
+    option "--redact-diff", "Redact manifest value changes in deployment"
+    option "--skip-drain [job1,job2]", String, "Skip drain script for either specific or all jobs"
     def perform
       auth_required
       recreate = !!options[:recreate]
       redact_diff = !!options[:redact_diff]
 
-      manifest_yaml = prepare_deployment_manifest(
-        :yaml => true, :resolve_properties => true)
+      manifest = prepare_deployment_manifest(resolve_properties: true, show_state: true)
 
-      inspect_deployment_changes(Psych.load(manifest_yaml),
-        interactive: interactive?, redact_diff: redact_diff)
+      inspect_deployment_changes(
+        manifest.hash,
+        interactive: interactive?,
+        redact_diff: redact_diff
+      )
       say('Please review all changes carefully'.make_yellow) if interactive?
 
-      deployment_name = File.basename(deployment)
-
       header('Deploying')
-      say("Deployment name: `#{deployment_name.make_green}'")
-      say("Director name: `#{target_name.make_green}'")
 
       unless confirmed?('Are you sure you want to deploy?')
         cancel_deployment
       end
 
-      status, task_id = director.deploy(manifest_yaml, :recreate => recreate)
+      deploy_options = { recreate: recreate }
 
-      task_report(status, task_id, "Deployed `#{deployment_name.make_green}' to `#{target_name.make_green}'")
+      if options.has_key?(:skip_drain)
+        # when key is present but no jobs specified OptionParser
+        # adds a key with nil value, in that case we want to
+        # skip drain for all jobs
+        deploy_options[:skip_drain] = options[:skip_drain].nil? ? '*' : options[:skip_drain]
+      end
+
+      status, task_id = director.deploy(manifest.yaml, deploy_options)
+
+      task_report(status, task_id, "Deployed `#{manifest.name.make_green}' to `#{target_name.make_green}'")
     end
 
     # bosh delete deployment
     usage "delete deployment"
     desc "Delete deployment"
     option "--force", "ignore errors while deleting"
-    def delete(name)
+    def delete(deployment_name)
       auth_required
+      show_current_state(deployment_name)
+
       force = !!options[:force]
 
-      say("\nYou are going to delete deployment `#{name}'.".make_red)
+      say("\nYou are going to delete deployment `#{deployment_name}'.".make_red)
       nl
       say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
 
@@ -126,10 +136,10 @@ module Bosh::Cli::Command
       end
 
       begin
-        status, result = director.delete_deployment(name, :force => force)
-        task_report(status, result, "Deleted deployment `#{name}'")
+        status, result = director.delete_deployment(deployment_name, :force => force)
+        task_report(status, result, "Deleted deployment `#{deployment_name}'")
       rescue Bosh::Cli::ResourceNotFound
-        task_report(:done, nil, "Skipped delete of missing deployment `#{name}'")
+        task_report(:done, nil, "Skipped delete of missing deployment `#{deployment_name}'")
       end
     end
 
@@ -139,14 +149,14 @@ module Bosh::Cli::Command
          "deployment manifest as the source of properties"
     def validate_jobs
       check_if_release_dir
-      manifest = prepare_deployment_manifest(:resolve_properties => true)
+      manifest = prepare_deployment_manifest(:resolve_properties => true, show_state: true)
 
-      if manifest["release"]
-        release_name = manifest["release"]["name"]
-      elsif manifest["releases"].count > 1
+      if manifest.hash["release"]
+        release_name = manifest.hash["release"]["name"]
+      elsif manifest.hash["releases"].count > 1
         err("Cannot validate a deployment manifest with more than 1 release")
       else
-        release_name = manifest["releases"].first["name"]
+        release_name = manifest.hash["releases"].first["name"]
       end
       if release_name == release.dev_name || release_name == release.final_name
         nl
@@ -166,7 +176,7 @@ module Bosh::Cli::Command
       )
 
       say(" - validating properties")
-      validator = Bosh::Cli::JobPropertyValidator.new(jobs, manifest)
+      validator = Bosh::Cli::JobPropertyValidator.new(jobs, manifest.hash)
       validator.validate
 
       unless validator.jobs_without_properties.empty?
@@ -201,6 +211,8 @@ module Bosh::Cli::Command
     desc "Show the list of available deployments"
     def list
       auth_required
+      show_current_state
+
       deployments = director.list_deployments
 
       err("No deployments") if deployments.empty?
@@ -224,6 +236,7 @@ module Bosh::Cli::Command
     desc "Download deployment manifest locally"
     def download_manifest(deployment_name, save_as = nil)
       auth_required
+      show_current_state(deployment_name)
 
       if save_as && File.exists?(save_as) &&
          !confirmed?("Overwrite `#{save_as}'?")

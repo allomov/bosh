@@ -18,7 +18,7 @@ describe 'cli: stemcell', type: :integration do
   end
 
   # ~65s (possibly includes sandbox start)
-  it 'can upload a stemcell' do
+  it 'can upload a stemcell and capture its metadata' do
     stemcell_filename = spec_asset('valid_stemcell.tgz')
 
     target_and_login
@@ -29,6 +29,7 @@ describe 'cli: stemcell', type: :integration do
     expect(out).to match /stemcells total: 1/i
     expect(out).to match /ubuntu-stemcell.+1/
     expect(out).to match regexp(expected_id.to_s)
+    expect(out).to match /\| toronto-os \|/
 
     stemcell_path = File.join(current_sandbox.cloud_storage_dir, "stemcell_#{expected_id}")
     expect(File).to be_exists(stemcell_path)
@@ -52,7 +53,7 @@ describe 'cli: stemcell', type: :integration do
 
   context 'when stemcell is in use by a deployment' do
     it 'refuses to delete it' do
-      deploy_simple
+      deploy_from_scratch
       results = bosh_runner.run('delete stemcell ubuntu-stemcell 1', failure_expected: true)
       expect(results).to include("Stemcell `ubuntu-stemcell/1' is still in use by: simple")
     end

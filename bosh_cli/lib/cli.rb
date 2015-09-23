@@ -56,6 +56,7 @@ require 'cli/glob_match'
 require 'cli/yaml_helper'
 require 'cli/dependency_helper'
 require 'cli/deployment_manifest'
+require 'cli/manifest'
 require 'cli/manifest_warnings'
 require 'cli/deployment_helper'
 require 'cli/validation'
@@ -106,6 +107,9 @@ require 'cli/command_discovery'
 require 'cli/command_handler'
 require 'cli/runner'
 require 'cli/base_command'
+
+require 'cli/client/uaa/token_provider'
+require 'cli/client/uaa/auth_info'
 
 tmpdir = Dir.mktmpdir
 at_exit { FileUtils.rm_rf(tmpdir) }

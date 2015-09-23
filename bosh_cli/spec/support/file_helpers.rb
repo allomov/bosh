@@ -13,6 +13,8 @@ module Support
         else
           all_files_and_dirs.reject! { |f| File.directory?(f) }
         end
+
+        all_files_and_dirs
       end
     end
 
@@ -94,6 +96,14 @@ module Support
         FileUtils.remove_entry artifacts_dir if File.exists?(artifacts_dir)
         tarballs.each do |tarball|
           tarball.cleanup
+        end
+      end
+
+      def git_init
+        Dir.chdir(@path) do
+          `git init`
+          `git add -A`
+          `git commit -m 'initial commit'`
         end
       end
 

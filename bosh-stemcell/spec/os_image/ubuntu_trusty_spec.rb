@@ -4,6 +4,7 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
   it_behaves_like 'every OS image'
   it_behaves_like 'an upstart-based OS image'
   it_behaves_like 'a Linux kernel 3.x based OS image'
+  it_behaves_like 'a Linux kernel module configured OS image'
 
   describe package('apt') do
     it { should be_installed }
@@ -11,6 +12,12 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
 
   describe package('rpm') do
     it { should_not be_installed }
+  end
+
+  context 'installed by system_kernel' do
+    describe package('linux-generic-lts-vivid') do
+      it { should be_installed }
+    end
   end
 
   context 'installed by base_debootstrap' do
@@ -115,6 +122,10 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
       iptables
       sysstat
       rsync
+      rsyslog
+      rsyslog-relp
+      rsyslog-gnutls
+      rsyslog-mmjsonparse
       openssh-server
       traceroute
       libncurses5-dev
@@ -149,9 +160,8 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
   context 'installed by base_ssh' do
     subject(:sshd_config) { file('/etc/ssh/sshd_config') }
 
-    it 'disallows CBC ciphers' do
+    it 'only allow 3DES and AES series ciphers (stig: V-38617)' do
       ciphers = %w(
-        chacha20-poly1305@openssh.com
         aes256-gcm@openssh.com
         aes128-gcm@openssh.com
         aes256-ctr
@@ -211,17 +221,6 @@ describe 'Ubuntu 14.04 OS image', os_image: true do
     end
   end
 
-  context 'installed by rsyslog_build' do
-    describe file('/etc/rsyslog.d/enable-kernel-logging.conf') do
-      it { should be_file }
-      it { should contain('ModLoad imklog') }
-    end
-
-    describe command('rsyslogd -v') do
-      it { should return_stdout /7\.4\.6/ }
-    end
-  end
-
   context 'configured by cron_config' do
     describe file '/etc/cron.daily/man-db' do
       it { should_not be_file }
@@ -237,6 +236,26 @@ APT::Periodic {
   Enable "0";
 }
 EOF
+    end
+  end
+
+  context 'overriding control alt delete (stig: V-38668)' do
+    describe file('/etc/init/control-alt-delete.override') do
+      it { should be_file }
+      it { should contain 'exec /usr/bin/logger -p security.info "Control-Alt-Delete pressed"' }
+    end
+  end
+
+  context 'package signature verification (stig: V-38462)' do
+    # verify default behavior was not changed
+    describe command('grep -R AllowUnauthenticated /etc/apt/apt.conf.d/') do
+      its (:stdout) { should eq('') }
+    end
+  end
+
+  context 'official Ubuntu gpg key is installed (stig: V-38476)' do
+    describe command('apt-key list') do
+      its (:stdout) { should include('Ubuntu Archive Automatic Signing Key') }
     end
   end
 end

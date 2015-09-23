@@ -13,6 +13,8 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
       it { should contain 'selinux=0' }
       it { should contain 'plymouth.enable=0' }
       it { should_not contain 'xen_blkfront.sda_is_xvda=1'}
+      # single-user mode boot should be disabled (stig: V-38586)
+      it { should_not contain 'single' }
     end
 
     # GRUB 0.97 configuration (used only on Amazon PV hosts) must have same kernel params as GRUB 2
@@ -54,18 +56,6 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
     end
   end
 
-  context 'installed by image_vsphere_cdrom stage', {
-    exclude_on_aws: true,
-    exclude_on_vcloud: true,
-    exclude_on_warden: true,
-    exclude_on_openstack: true,
-  } do
-    describe file('/etc/sysctl.conf') do
-      it { should be_file }
-      it { should contain 'dev.cdrom.lock=0' }
-    end
-  end
-
   context 'installed by bosh_aws_agent_settings', {
     exclude_on_openstack: true,
     exclude_on_vcloud: true,
@@ -74,20 +64,6 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
   } do
     describe file('/var/vcap/bosh/agent.json') do
       it { should be_valid_json_file }
-      it { should contain('"Type": "HTTP"') }
-    end
-  end
-
-  context 'installed by bosh_openstack_agent_settings', {
-    exclude_on_aws: true,
-    exclude_on_vcloud: true,
-    exclude_on_vsphere: true,
-    exclude_on_warden: true,
-  } do
-    describe file('/var/vcap/bosh/agent.json') do
-      it { should be_valid_json_file }
-      it { should_not contain('"CreatePartitionIfNoEphemeralDisk": true') }
-      it { should contain('"Type": "ConfigDrive"') }
       it { should contain('"Type": "HTTP"') }
     end
   end

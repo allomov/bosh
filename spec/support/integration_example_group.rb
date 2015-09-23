@@ -4,7 +4,7 @@ require 'bosh/dev/sandbox/main'
 
 module IntegrationExampleGroup
   def logger
-    @logger ||= Logger.new(STDOUT)
+    @logger ||= current_sandbox.logger
   end
 
   def director
@@ -52,18 +52,28 @@ module IntegrationExampleGroup
 
   def target_and_login
     bosh_runner.run("target #{current_sandbox.director_url}")
-    bosh_runner.run('login admin admin')
+    bosh_runner.run('login test test')
   end
 
-  def create_and_upload_test_release
+  def upload_cloud_config(options={})
+    cloud_config_hash = options.fetch(:cloud_config_hash, Bosh::Spec::Deployments.simple_cloud_config)
+    cloud_config_manifest = yaml_file('simple', cloud_config_hash)
+    bosh_runner.run("update cloud-config #{cloud_config_manifest.path}", options)
+  end
+
+  def create_and_upload_test_release(options={})
     Dir.chdir(ClientSandbox.test_release_dir) do
-      bosh_runner.run_in_current_dir('create release')
-      bosh_runner.run_in_current_dir('upload release')
+      bosh_runner.run_in_current_dir('create release', options)
+      bosh_runner.run_in_current_dir('upload release', options)
     end
   end
 
-  def upload_stemcell
-    bosh_runner.run("upload stemcell #{spec_asset('valid_stemcell.tgz')}")
+  def upload_stemcell(options={})
+    bosh_runner.run("upload stemcell #{spec_asset('valid_stemcell.tgz')} --skip-if-exists", options)
+  end
+
+  def delete_stemcell
+    bosh_runner.run("delete stemcell ubuntu-stemcell 1")
   end
 
   def set_deployment(options)
@@ -76,15 +86,28 @@ module IntegrationExampleGroup
   end
 
   def deploy(options)
-    no_track = options.fetch(:no_track, false)
-    redact_diff = options.fetch(:redact_diff, false)
-    bosh_runner.run("#{no_track ? '--no-track ' : ''}deploy#{redact_diff ? ' --redact-diff' : ''}", options)
+    cmd = options.fetch(:no_track, false) ? '--no-track ' : ''
+    cmd += 'deploy'
+    cmd += options.fetch(:redact_diff, false) ? ' --redact-diff' : ''
+    cmd += options.fetch(:recreate, false) ? ' --recreate' : ''
+
+    if options[:skip_drain]
+      if options[:skip_drain].is_a?(Array)
+        cmd += " --skip-drain #{options[:skip_drain].join(',')}"
+      else
+        cmd += ' --skip-drain'
+      end
+    end
+
+    bosh_runner.run(cmd, options)
   end
 
-  def deploy_simple(options={})
-    target_and_login
-    create_and_upload_test_release
-    upload_stemcell
+  def deploy_from_scratch(options={})
+    target_and_login unless options.fetch(:no_login, false)
+
+    create_and_upload_test_release(options)
+    upload_stemcell(options)
+    upload_cloud_config(options) unless options[:legacy]
     deploy_simple_manifest(options)
   end
 
@@ -94,7 +117,7 @@ module IntegrationExampleGroup
 
     output, exit_code = deploy(options.merge({return_exit_code: true}))
 
-    expect($?.success?).to_not eq(options.fetch(:failure_expected, false))
+    expect(exit_code == 0).to_not eq(options.fetch(:failure_expected, false))
 
     return_exit_code ? [output, exit_code] : output
   end
@@ -114,6 +137,23 @@ module IntegrationExampleGroup
     Regexp.compile(Regexp.escape(string))
   end
 
+  def scrub_blobstore_ids(bosh_output)
+    bosh_output.gsub /[0-9a-f]{8}-[0-9a-f-]{27}/, "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  end
+
+  def extract_agent_messages(nats_messages, agent_id)
+    nats_messages.select { |val|
+      # messages for the agent we care about
+      val[0] == "agent.#{agent_id}"
+    }.map { |val|
+      # parse JSON payload
+      JSON.parse(val[1])
+    }.flat_map { |val|
+      # extract method from messages that have it
+      val["method"] ? [val["method"]] : []
+    }
+  end
+
   def format_output(out)
     out.gsub(/^\s*/, '').gsub(/\s*$/, '')
   end
@@ -121,7 +161,7 @@ module IntegrationExampleGroup
   # forcefully suppress raising on error...caller beware
   def expect_output(cmd, expected_output)
     expect(format_output(bosh_runner.run(cmd, :failure_expected => true))).
-      to eq(format_output(expected_output))
+      to include(format_output(expected_output))
   end
 
   def expect_running_vms(job_name_index_list)

@@ -1,6 +1,8 @@
+require File.expand_path(File.dirname(__FILE__) + '/../../release_print_helper.rb')
 module Bosh::Cli::Command
   module Release
     class CreateRelease < Base
+      include ReleasePrintHelper
       include Bosh::Cli::DependencyHelper
 
       DEFAULT_RELEASE_NAME = 'bosh-release'
@@ -14,8 +16,10 @@ module Bosh::Cli::Command
       option '--dry-run', 'stop before writing release manifest'
       option '--name NAME', 'specify a custom release name'
       option '--version VERSION', 'specify a custom version number (ex: 1.0.0 or 1.0-beta.2+dev.10)'
+      option '--dir RELEASE_DIRECTORY', 'path to release directory'
 
       def create(manifest_file = nil)
+        switch_to_release_dir
         check_if_release_dir
 
         migrate_to_support_multiple_releases
@@ -26,7 +30,7 @@ module Bosh::Cli::Command
           end
 
           say('Recreating release from the manifest')
-          Bosh::Cli::ReleaseCompiler.compile(manifest_file, cache_dir, release.blobstore)
+          Bosh::Cli::ReleaseCompiler.compile(manifest_file, cache_dir, release.blobstore, [], release.dir)
           release_filename = manifest_file
         else
           version = options[:version]
@@ -53,9 +57,9 @@ module Bosh::Cli::Command
         # can't migrate without a default release name
         return if default_release_name.blank?
 
-        Bosh::Cli::Versions::MultiReleaseSupport.new(@work_dir, default_release_name, self).migrate
+        Bosh::Cli::Versions::MultiReleaseSupport.new(release.dir, default_release_name, self).migrate
       end
-      
+
       def create_from_spec(version)
         force = options[:force]
         name = options[:name]
@@ -137,7 +141,7 @@ module Bosh::Cli::Command
       end
 
       def archive_repository_provider
-        @archive_repository_provider ||= Bosh::Cli::ArchiveRepositoryProvider.new(work_dir, cache_dir, release.blobstore)
+        @archive_repository_provider ||= Bosh::Cli::ArchiveRepositoryProvider.new(release.dir, cache_dir, release.blobstore)
       end
 
       def build_release(job_artifacts, manifest_only, package_artifacts, license_artifacts, name, version)
@@ -161,7 +165,7 @@ module Bosh::Cli::Command
       end
 
       def build_packages
-        packages = Bosh::Cli::Resources::Package.discover(work_dir)
+        packages = Bosh::Cli::Resources::Package.discover(release.dir)
         artifacts = packages.map do |package|
           say("Building #{package.name.make_green}...")
           artifact = archive_builder.build(package)
@@ -187,7 +191,7 @@ module Bosh::Cli::Command
       end
 
       def build_jobs(packages)
-        jobs = Bosh::Cli::Resources::Job.discover(work_dir, packages)
+        jobs = Bosh::Cli::Resources::Job.discover(release.dir, packages)
         artifacts = jobs.map do |job|
           say("Building #{job.name.make_green}...")
           artifact = archive_builder.build(job)
@@ -199,7 +203,7 @@ module Bosh::Cli::Command
       end
 
       def build_licenses
-        licenses = Bosh::Cli::Resources::License.discover(work_dir)
+        licenses = Bosh::Cli::Resources::License.discover(release.dir)
         artifacts = licenses.map do |license|
           say("Building #{'license'.make_green}...")
           artifact = archive_builder.build(license)
@@ -234,63 +238,6 @@ module Bosh::Cli::Command
           release.dev_name = release.final_name ? release.final_name : DEFAULT_RELEASE_NAME
         end
         release.save_config
-      end
-
-      def show_summary(builder)
-        packages_table = table do |t|
-          t.headings = %w(Name Version Notes)
-          builder.packages.each do |package_artifact|
-            t << artifact_summary(package_artifact)
-          end
-        end
-
-        jobs_table = table do |t|
-          t.headings = %w(Name Version Notes)
-          builder.jobs.each do |job_artifact|
-            t << artifact_summary(job_artifact)
-          end
-        end
-
-        if builder.license
-          license_table = table do |t|
-            t.headings = %w(Name Version Notes)
-            t << artifact_summary(builder.license)
-          end
-
-          say('License')
-          say(license_table)
-          nl
-        end
-
-        say('Packages')
-        say(packages_table)
-        nl
-        say('Jobs')
-        say(jobs_table)
-
-        affected_jobs = builder.affected_jobs
-
-        if affected_jobs.size > 0
-          nl
-          say('Jobs affected by changes in this release')
-
-          affected_jobs_table = table do |t|
-            t.headings = %w(Name Version)
-            affected_jobs.each do |job|
-              t << [job.name, job.version]
-            end
-          end
-
-          say(affected_jobs_table)
-        end
-      end
-
-      def artifact_summary(artifact)
-        [
-          artifact.name,
-          artifact.version,
-          artifact.new_version? ? 'new version' : '',
-        ]
       end
 
       def commit_hash

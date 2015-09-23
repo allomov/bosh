@@ -6,7 +6,8 @@ module Bosh::Director
     describe Controllers::DeploymentsController do
       include Rack::Test::Methods
 
-      subject(:app) { described_class.new(Config.new({})) }
+      subject(:app) { described_class.new(config) }
+      let(:config) { Config.load_hash(test_config) }
 
       let(:temp_dir) { Dir.mktmpdir}
       let(:test_config) do
@@ -24,7 +25,7 @@ module Bosh::Director
       end
 
       before do
-        App.new(Config.load_hash(test_config))
+        App.new(config)
         basic_authorize 'admin', 'admin'
       end
 
@@ -61,6 +62,23 @@ module Bosh::Director
                 create(:name => 'foo', :manifest => Psych.dump({'foo' => 'bar'}))
             put '/foo/jobs/dea/2?state=stopped', spec_asset('test_conf.yaml'), { 'CONTENT_TYPE' => 'text/yaml' }
             expect_redirect_to_queued_task(last_response)
+          end
+
+          it 'allows putting job instances into different states with content_length of 0' do
+            RSpec::Matchers.define :not_to_have_body do |unexpected|
+              match { |actual| actual.read != unexpected.read }
+            end
+
+            manifest = spec_asset('test_conf.yaml')
+            allow_any_instance_of(DeploymentManager).to receive(:create_deployment).
+                with(anything(), not_to_have_body(StringIO.new(manifest)), anything(), anything()).
+                and_return(OpenStruct.new(:id => 'no_content_length'))
+            Models::Deployment.
+              create(:name => 'foo', :manifest => Psych.dump({'foo' => 'bar'}))
+            put '/foo/jobs/dea/2?state=stopped', manifest, {'CONTENT_TYPE' => 'text/yaml', 'CONTENT_LENGTH' => 0}
+
+            match = last_response.location.match(%r{/tasks/no_content_length})
+            expect(match).to_not be_nil
           end
 
           it 'allows putting the job instance into different resurrection_paused values' do
@@ -143,9 +161,8 @@ module Bosh::Director
             stemcell_1_2 = Models::Stemcell.create(name: "stemcell-1", version: 2, cid: 123)
             stemcell_2_1 = Models::Stemcell.create(name: "stemcell-2", version: 1, cid: 124)
 
-            old_cloud_config = Models::CloudConfig.create(properties: "", created_at: Time.now - 60)
-            new_cloud_config = Models::CloudConfig.create(properties: "", created_at: Time.now)
-
+            old_cloud_config = Models::CloudConfig.make(manifest: {}, created_at: Time.now - 60)
+            new_cloud_config = Models::CloudConfig.make(manifest: {})
 
             deployment_3 = Models::Deployment.create(
               name: "deployment-3",
@@ -416,37 +433,35 @@ module Bosh::Director
             end
 
             let!(:deployment_model) do
+
+              manifest_hash = Bosh::Spec::Deployments.manifest_with_errand
+              manifest_hash['jobs'] << {
+                'name' => 'another-errand',
+                'template' => 'errand1',
+                'lifecycle' => 'errand',
+                'resource_pool' => 'a',
+                'instances' => 1,
+                'networks' => [{'name' => 'a'}]
+              }
               Models::Deployment.make(
                 name: 'fake-dep-name',
-                manifest: "---\nmanifest: true",
+                manifest: Psych.dump(manifest_hash),
+                cloud_config: cloud_config
               )
             end
+            let(:cloud_config) { Models::CloudConfig.make }
 
             before { allow(Config).to receive(:event_log).with(no_args).and_return(event_log) }
-            let(:event_log) { instance_double('Bosh::Director::EventLog::Log') }
+            let(:event_log) { instance_double('Bosh::Director::EventLog::Log', track: nil) }
 
             before { allow(Config).to receive(:logger).with(no_args).and_return(logger) }
-
-            before do
-              allow(DeploymentPlan::Planner).to receive(:parse).
-                with({'manifest' => true}, {}, event_log, logger).
-                and_return(deployment)
-            end
-            let(:deployment) { instance_double('Bosh::Director::DeploymentPlan::Planner', name: 'deployment') }
-
-            before { allow(deployment).to receive(:jobs).and_return(jobs) }
-            let(:jobs) { [
-              instance_double('Bosh::Director::DeploymentPlan::Job', name: 'an-errand', can_run_as_errand?: true),
-              instance_double('Bosh::Director::DeploymentPlan::Job', name: 'a-service', can_run_as_errand?: false),
-              instance_double('Bosh::Director::DeploymentPlan::Job', name: 'another-errand', can_run_as_errand?: true),
-            ]}
 
             context 'authenticated access' do
               before { authorize 'admin', 'admin' }
 
               it 'returns errands in deployment' do
                 response = perform
-                expect(response.body).to eq('[{"name":"an-errand"},{"name":"another-errand"}]')
+                expect(response.body).to eq('[{"name":"fake-errand-name"},{"name":"another-errand"}]')
                 expect(last_response.status).to eq(200)
               end
 
@@ -518,6 +533,41 @@ module Bosh::Director
                 expect(last_response.status).to eq(401)
               end
             end
+          end
+        end
+      end
+
+      describe 'scope' do
+        let(:identity_provider) { Support::TestIdentityProvider.new }
+        let(:config) do
+          config = Config.load_hash(test_config)
+          allow(config).to receive(:identity_provider).and_return(identity_provider)
+          config
+        end
+
+        it 'accepts read scope for routes allowing read access' do
+          read_routes = [
+            '/',
+            '/deployment-name',
+            '/deployment-name/errands',
+            '/deployment-name/vms'
+          ]
+
+          read_routes.each do |route|
+            get route
+            expect(identity_provider.scope).to eq(:read)
+          end
+
+          non_read_routes = [
+            [:get, '/deployment-name/jobs/fake-job/0'],
+            [:put, '/deployment-name/jobs/0'],
+            [:post, '/deployment-name/ssh'],
+            [:post, '/deployment-name/scans'],
+          ]
+
+          non_read_routes.each do |method, route|
+            method(method).call(route)
+            expect(identity_provider.scope).to eq(:write)
           end
         end
       end

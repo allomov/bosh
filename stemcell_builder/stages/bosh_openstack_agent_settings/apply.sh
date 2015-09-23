@@ -5,9 +5,9 @@ source $base_dir/lib/prelude_apply.bash
 
 agent_settings_file=$chroot/var/vcap/bosh/agent.json
 
-if [ "${stemcell_operating_system}" == "centos" -o "${stemcell_operating_system}" == "rhel" ]; then
+if [ "${stemcell_operating_system}" == "rhel" ]; then
 
-  # CreatePartitionIfNoEphemeralDisk option is not supported on CentOS
+  # CreatePartitionIfNoEphemeralDisk option is not supported on Rhel
   cat > $agent_settings_file <<JSON
 {
   "Platform": {
@@ -16,7 +16,6 @@ if [ "${stemcell_operating_system}" == "centos" -o "${stemcell_operating_system}
     }
   },
   "Infrastructure": {
-    "NetworkingType": "dhcp",
     "Settings": {
       "Sources": [
         {
@@ -52,8 +51,6 @@ else
     }
   },
   "Infrastructure": {
-    "NetworkingType": "dhcp",
-
     "Settings": {
       "Sources": [
         {

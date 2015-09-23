@@ -1,5 +1,3 @@
-# Copyright (c) 2009-2012 VMware, Inc.
-
 require 'spec_helper'
 
 module Bosh::Director
@@ -121,7 +119,9 @@ module Bosh::Director
             with('agent-222', 'sc-302', { 'foo' => 'bar' }, ['A', 'B', 'C'], [], { 'key1' => 'value1' })
 
           expect(fake_new_agent).to receive(:wait_until_ready).ordered
+          expect(fake_new_agent).to receive(:update_settings).ordered
           expect(fake_new_agent).to receive(:apply).with(spec).ordered
+          expect(fake_new_agent).to receive(:run_script).with('pre-start', {}).ordered
           expect(fake_new_agent).to receive(:start).ordered
 
           expect(Models::Vm.find(agent_id: 'agent-007')).not_to be_nil
@@ -134,12 +134,6 @@ module Bosh::Director
     end
 
     describe 'delete_vm_reference resolution' do
-      it 'skips delete_vm_reference if CID is present' do
-        expect(@agent).to receive(:ping).and_raise(RpcTimeout)
-        expect {
-          handler.apply_resolution(:delete_vm_reference)
-        }.to raise_error(ProblemHandlerError, /has a cloud id/)
-      end
 
       it 'skips deleting VM ref if agent is now alive' do
         @vm.update(cid: nil)

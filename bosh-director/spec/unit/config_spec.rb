@@ -141,10 +141,10 @@ describe Bosh::Director::Config do
 
       context 'when uaa provider is supplied' do
         let(:provider) { 'uaa' }
-        let(:provider_options) { {'key' => 'some-key', 'url' => 'some-url'} }
+        let(:provider_options) { {'symmetric_key' => 'some-key', 'url' => 'some-url'} }
         let(:token) { CF::UAA::TokenCoder.new(skey: 'some-key').encode(payload) }
-        let(:payload) { {'user_name' => 'larry', 'aud' => ['bosh_cli']} }
-        before { test_config['user_management']['options'] = provider_options }
+        let(:payload) { {'user_name' => 'larry', 'aud' => ['bosh_cli'], 'scope' => ['bosh.admin']} }
+        before { test_config['user_management']['uaa'] = provider_options }
 
         it 'creates a UAAIdentityProvider' do
           expect(config.identity_provider).to be_a(Bosh::Director::Api::UAAIdentityProvider)
@@ -152,8 +152,34 @@ describe Bosh::Director::Config do
 
         it 'creates the UAAIdentityProvider with the configured key' do
           request_env = {'HTTP_AUTHORIZATION' => "bearer #{token}"}
-          expect(config.identity_provider.corroborate_user(request_env)).to eq('larry')
+          user = config.identity_provider.get_user(request_env)
+          expect(user.username).to eq('larry')
         end
+      end
+    end
+  end
+
+  describe '#override_uuid' do
+    before { described_class.configure(test_config) }
+
+    context 'when state.json exists' do
+      let(:state_file) { File.join(test_config['dir'], 'state.json') }
+
+      before do
+        File.open(state_file, 'a+') { |f| f.write(JSON.dump({'uuid' => 'fake-uuid'})) }
+      end
+
+      after { FileUtils.rm_rf(state_file) }
+
+      it 'migrates director uuid to database' do
+        expect(described_class.override_uuid).to eq('fake-uuid')
+        expect(Bosh::Director::Models::DirectorAttribute.first(name: 'uuid').value).to eq('fake-uuid')
+      end
+    end
+
+    context 'when state.json does not exist' do
+      it 'returns nil' do
+        expect(described_class.override_uuid).to eq(nil)
       end
     end
   end

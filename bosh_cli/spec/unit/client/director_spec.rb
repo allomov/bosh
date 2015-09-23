@@ -128,7 +128,8 @@ describe Bosh::Cli::Client::Director do
     end
 
     context 'using token credentials' do
-      let(:credentials) { Bosh::Cli::Client::UaaCredentials.new('bearer token') }
+      let(:credentials) { Bosh::Cli::Client::UaaCredentials.new(token_provider) }
+      let(:token_provider) { instance_double(Bosh::Cli::Client::Uaa::TokenProvider, token: 'bearer token') }
       let(:request_headers) { { 'Content-Type' => 'application/json', 'Authorization' => 'bearer token' } }
 
       it 'adds authorization header with UAA token' do
@@ -250,6 +251,12 @@ describe Bosh::Cli::Client::Director do
       expect(@director).to receive(:get).with('/releases', 'application/json').
         and_return([200, JSON.generate([]), {}])
       @director.list_releases
+    end
+
+    it 'inspects releases, correctly encoding +' do
+      expect(@director).to receive(:get).with('/releases/my_release?version=123%2Bdev.5', 'application/json').
+        and_return([200, JSON.generate([]), {}])
+      @director.inspect_release('my_release', '123+dev.5')
     end
 
     it 'lists deployments' do
@@ -672,7 +679,7 @@ describe Bosh::Cli::Client::Director do
     end
 
     it 'supports uploading with progress bar' do
-      file = spec_asset('valid_release.tgz')
+      file = spec_asset('test_release.tgz')
       f    = Bosh::Cli::FileWithProgressBar.open(file, 'r')
 
       allow(Bosh::Cli::FileWithProgressBar).to receive(:open).with(file, 'r').and_return(f)
@@ -721,7 +728,8 @@ describe Bosh::Cli::Client::Director do
 
       expect(@director).to receive(:perform_http_request).
         with(:get, 'https://127.0.0.1:8080/stuff', 'payload', 'h1' => 'a',
-             'h2'                                                  => 'b', 'Content-Type' => 'app/zb').
+             'h2'                                                  => 'b',
+             'Content-Type' => 'app/zb', 'Host'=>'target.example.com').
         and_return(mock_response)
 
       expect(@director.send(:request, :get, '/stuff', 'app/zb', 'payload',
@@ -826,6 +834,7 @@ describe Bosh::Cli::Client::Director do
         HTTPClient::TimeoutError.new('fake-error'),
         HTTPClient::KeepAliveDisconnected.new('fake-error'),
         OpenSSL::SSL::SSLError.new('fake-error'),
+        OpenSSL::X509::StoreError.new('fake-error')
       ].each do |error|
         context "when performing request fails with #{error} error" do
           it 'raises DirectorInaccessible error because director could not be reached' do

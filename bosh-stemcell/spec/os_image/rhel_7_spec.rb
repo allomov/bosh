@@ -5,6 +5,7 @@ describe 'RHEL 7 OS image', os_image: true do
   it_behaves_like 'a CentOS or RHEL based OS image'
   it_behaves_like 'a systemd-based OS image'
   it_behaves_like 'a Linux kernel 3.x based OS image'
+  it_behaves_like 'a Linux kernel module configured OS image'
 
   context 'installed by base_rhel' do
     describe command('rct cat-cert /etc/pki/product/69.pem') do
@@ -53,6 +54,7 @@ describe 'RHEL 7 OS image', os_image: true do
       NetworkManager
       nmap-ncat
       openssh-server
+      openssl
       openssl-devel
       parted
       psmisc
@@ -85,14 +87,6 @@ describe 'RHEL 7 OS image', os_image: true do
   context 'installed by system_grub' do
     describe package('grub2-tools') do
       it { should be_installed }
-    end
-  end
-
-  context 'rsyslog_build' do
-    describe file('/etc/rsyslog_build.d/enable-kernel-logging.conf') do
-      # Make sure imklog module is not loaded in rsyslog_build
-      # to avoid CentOS stemcell pegging CPU on AWS
-      it { should_not be_file } # (do not add $ in front of ModLoad because it will break the serverspec regex match)
     end
   end
 end

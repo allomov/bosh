@@ -8,6 +8,7 @@ require "cloud/config"
 require "cloud/errors"
 require "cloud/provider"
 require "cloud/external_cpi"
+require "cloud/internal_cpi"
 
 module Bosh
 
@@ -98,7 +99,7 @@ module Bosh
     end
 
     ##
-    # Deletes a VM
+    # Deletes a VM. If the VM has already been deleted, this call returns normally and has no effect.
     #
     # @param [String] vm vm id that was once returned by {#create_vm}
     # @return [void]

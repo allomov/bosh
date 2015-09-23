@@ -43,7 +43,7 @@ shared_examples_for 'a CentOS or RHEL based OS image' do
   context 'installed by base_ssh' do
     subject(:sshd_config) { file('/etc/ssh/sshd_config') }
 
-    it 'disallows CBC ciphers' do
+    it 'only allow 3DES and AES series ciphers (stig: V-38617)' do
       ciphers = %w(
         aes256-ctr
         aes192-ctr
@@ -85,6 +85,12 @@ shared_examples_for 'a CentOS or RHEL based OS image' do
   context 'configured by cron_config' do
     describe file '/etc/cron.daily/man-db.cron' do
       it { should_not be_file }
+    end
+  end
+
+  context 'package signature verification (stig: V-38462)' do
+    describe command('grep nosignature /etc/rpmrc /usr/lib/rpm/rpmrc /usr/lib/rpm/redhat/rpmrc ~root/.rpmrc') do
+      its (:stdout) { should_not include('nosignature') }
     end
   end
 end

@@ -56,6 +56,7 @@ module Bosh::Director
     let(:persistent_disk_changed) { false }
     let(:networks_changed) { false }
     let(:dns_changed) { false }
+    let(:trusted_certs_changed) { false }
     let(:disk_currently_attached) { false }
     let(:disk_size) { 0 }
     let(:instance) do
@@ -71,6 +72,7 @@ module Bosh::Director
              persistent_disk_changed?: persistent_disk_changed,
              networks_changed?: networks_changed,
              dns_changed?: dns_changed,
+             trusted_certs_changed?: trusted_certs_changed,
              spec: instance_spec,
              disk_currently_attached?: disk_currently_attached,
              network_settings: double('NetworkSettings'),
@@ -83,6 +85,18 @@ module Bosh::Director
     before do
       allow(AgentClient).to receive(:with_defaults).and_return(agent_client)
       allow(Bosh::Director::Config).to receive(:cloud).and_return(cloud)
+
+      allow(agent_client).to receive(:run_script)
+      allow(instance). to receive(:spec).and_return(
+                              {
+                                  'deployment' => 'simple',
+                                  'job' => {
+                                      'name' => 'job_with_templates_having_pre_start_scripts',
+                                      'templates' => [{'name' => 'job_with_pre_start'}]
+                                  }
+                              }
+                          )
+
     end
 
     describe '#report_progress' do
@@ -90,36 +104,9 @@ module Bosh::Director
       let(:event_log_task) { instance_double('Bosh::Director::EventLog::Task') }
 
       it 'advances the ticker' do
-        allow(subject).to receive(:update_steps).and_return(200)
+        allow(subject).to receive(:update_steps).and_return(['dummy_step'] * 200)
         expect(event_log_task).to receive(:advance).with(0.5)
-        subject.report_progress
-      end
-    end
-
-    describe '#update_steps' do
-      context 'when neither the job nor the packages have changed' do
-        describe '#update_steps' do
-          subject { super().update_steps }
-          it { is_expected.to eq(described_class::UPDATE_STEPS) }
-        end
-      end
-
-      context 'when the job has changed' do
-        let(:job_changed) { true }
-
-        describe '#update_steps' do
-          subject { super().update_steps }
-          it { is_expected.to eq(described_class::UPDATE_STEPS + 1) }
-        end
-      end
-
-      context 'when the packages have changed' do
-        let(:packages_changed) { true }
-
-        describe '#update_steps' do
-          subject { super().update_steps }
-          it { is_expected.to eq(described_class::UPDATE_STEPS + 1) }
-        end
+        subject.report_progress(200)
       end
     end
 
@@ -158,10 +145,16 @@ module Bosh::Director
       context 'with only a dns change' do
         let(:changes) { [:dns].to_set }
 
+        before do
+          allow(subject).to receive(:current_state).and_return({'job_state' => 'running'})
+        end
+
         it 'should only call update_dns' do
+          steps = subject.update_steps
+          expect(steps.length).to eq 1
+
           expect(subject).to receive(:update_dns)
-          expect(subject).to_not receive(:step)
-          subject.update
+          steps[0].call
         end
 
         it 'does not prepare instance' do
@@ -413,6 +406,18 @@ module Bosh::Director
       end
     end
 
+    describe '#run_pre_start_scripts' do
+      it 'tells the agent to run_pre_start_scripts' do
+        expect(agent_client).to receive(:run_script)
+        subject.run_pre_start_scripts
+      end
+
+      it 'send an array of scripts to the agent to run' do
+        expect(agent_client).to receive(:run_script).with("pre-start", {})
+        subject.run_pre_start_scripts
+      end
+    end
+
     describe '#need_start?' do
       context 'when target state is "started"' do
         it { is_expected.to be_need_start }
@@ -442,11 +447,12 @@ module Bosh::Director
 
     describe '#stop' do
       let(:state) { 'fake-target-state' }
+      before { allow(deployment_plan).to receive(:skip_drain_for_job?).with('test-job').and_return(false) }
 
       it 'stop an instance' do
         stopper = instance_double('Bosh::Director::InstanceUpdater::Stopper')
         expect(InstanceUpdater::Stopper).to receive(:new).
-          with(instance, agent_client, 'fake-target-state', Config, Config.logger).
+          with(instance, agent_client, 'fake-target-state', false, Config, Config.logger).
           and_return(stopper)
 
         expect(stopper).to receive(:stop).with(no_args)

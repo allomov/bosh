@@ -60,6 +60,7 @@ module Bosh::Director
   UserImmutableUsername = err(20001)
   UserInvalid = err(20002)
   UserNameTaken = err(20003)
+  UserManagementNotSupported = err(20004)
 
   ReleaseAlreadyExists = err(30000)
   ReleaseExistingPackageHashMismatch = err(30001)
@@ -72,6 +73,10 @@ module Bosh::Director
   ReleaseVersionInUse = err(30008)
   ReleaseDeleteFailed = err(30009)
   ReleaseVersionInvalid = err(30010)
+  ReleaseNotMatchingManifest = err(30011)
+  ReleaseInvalidPackage = err(30012)
+  ReleaseExistingJobFingerprintMismatch = err(30013)
+  ReleaseVersionCommitHashMismatch = err(30014)
 
   ValidationInvalidType = err(40000)
   ValidationMissingField = err(40001)
@@ -85,6 +90,7 @@ module Bosh::Director
   StemcellInUse = err(50004)
 
   PackageInvalidArchive = err(60000)
+  PackageMissingSourceCode = err(60001)
 
   # Models
   DeploymentNotFound = err(70000, NOT_FOUND)
@@ -113,6 +119,7 @@ module Bosh::Director
   JobIncompatibleSpecs = err(80010)
   JobPackageCollision = err(80011)
   JobInvalidPackageSpec = err(80012)
+  JobInvalidLinkSpec = err(80013)
 
   ResourceError = err(100001)
   ResourceNotFound = err(100002, NOT_FOUND)
@@ -180,6 +187,8 @@ module Bosh::Director
   DeploymentInvalidNetworkType = err(190009)
   DeploymentUnknownTemplate = err(190012)
   DeploymentDuplicateDiskPoolName = err(190013)
+  DeploymentInvalidProperty = err(190014)
+  DeploymentNoResourcePools = err(190015)
 
   DiskPoolInvalidDiskSize = err(200001)
 
@@ -209,6 +218,7 @@ module Bosh::Director
 
   PackageCompilationNetworkNotReserved = err(430001)
   PackageCompilationNotEnoughWorkersForReuse = err(430002)
+  PackageCompilationNotFound = err(430003)
 
   BadManifest = err(440001)
 

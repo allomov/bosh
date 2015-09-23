@@ -31,22 +31,36 @@ describe Bosh::Director::DeploymentPlan::NetworkSubnet do
       }.to raise_error(BD::ValidationMissingField)
     end
 
-    it "should require a gateway" do
-      expect {
-        subnet_spec(
+    context "gateway property" do
+      it "should require a gateway" do
+        expect {
+          subnet_spec(
             "range" => "192.168.0.0/24",
             "cloud_properties" => {"foo" => "bar"},
-        )
-      }.to raise_error(BD::ValidationMissingField)
+          )
+        }.to raise_error(BD::ValidationMissingField)
+      end
+
+      context "when the gateway is configured to be optional" do
+        it "should not require a gateway" do
+          allow(Bosh::Director::Config).to receive(:ignore_missing_gateway).and_return(true)
+
+          expect {
+            subnet_spec(
+              "range" => "192.168.0.0/24",
+              "cloud_properties" => {"foo" => "bar"},
+            )
+          }.to_not raise_error
+        end
+      end
     end
 
-    it "should require cloud properties" do
-      expect {
-        subnet_spec(
-          "range" => "192.168.0.0/24",
-          "gateway" => "192.168.0.254",
-        )
-      }.to raise_error(BD::ValidationMissingField)
+    it "default cloud properties to empty hash" do
+      subnet = subnet_spec(
+        "range" => "192.168.0.0/24",
+        "gateway" => "192.168.0.254",
+      )
+      expect(subnet.cloud_properties).to eq({})
     end
 
     it "should allow a gateway" do

@@ -8,17 +8,29 @@ module Bosh::Cli::Command
         'Rebases this release onto the latest version',
         'known by director (discards local job/package',
         'versions in favor of versions assigned by director)'
-      option '--skip-if-exists', 'skips upload if release already exists'
+      option '--skip-if-exists', 'no-op; retained for backward compatibility'
+      option '--dir RELEASE_DIRECTORY', 'path to release directory'
+
       def upload(release_file = nil)
         auth_required
+        switch_to_release_dir
+        show_current_state
 
         upload_options = {
           :rebase => options[:rebase],
           :repack => true,
-          :skip_if_exists => options[:skip_if_exists],
         }
 
-        if release_file.nil?
+        #only check release_dir if not compiled release tarball
+        file_type = `file --mime-type -b '#{release_file}'`
+
+        compiled_release = false
+        if file_type == /application\/x-gzip/
+          tarball = Bosh::Cli::ReleaseTarball.new(tarball_path)
+          compiled_release = tarball.compiled_release?
+        end
+
+        if release_file.nil? and !compiled_release
           check_if_release_dir
           release_file = release.latest_release_filename
           if release_file.nil?
@@ -33,7 +45,7 @@ module Bosh::Cli::Command
             err("Release file doesn't exist")
           end
 
-          file_type = `file --mime-type -b '#{release_file}'`
+          file_type = `file --mime-type -b '#{release_file}'` # duplicate? Already done on line 23
 
           if file_type =~ /text\/(plain|yaml)/
             upload_manifest(release_file, upload_options)
@@ -53,7 +65,7 @@ module Bosh::Cli::Command
         blobstore = release.blobstore
         tmpdir = Dir.mktmpdir
 
-        compiler = Bosh::Cli::ReleaseCompiler.new(manifest_path, cache_dir, blobstore, package_matches)
+        compiler = Bosh::Cli::ReleaseCompiler.new(manifest_path, cache_dir, blobstore, package_matches, release.dir)
         need_repack = true
 
         unless compiler.exists?
@@ -90,26 +102,15 @@ module Bosh::Cli::Command
           tarball_path = tarball.convert_to_old_format
         end
 
-        remote_release = get_remote_release(tarball.release_name) rescue nil
-        if remote_release && !rebase
-          version = if new_director?
-                      Bosh::Common::Version::ReleaseVersion.parse(tarball.version)
-                    else
-                      tarball.version
-                    end
-          if remote_release['versions'].include?(version.to_s)
-            if upload_options[:skip_if_exists]
-              say("Release `#{tarball.release_name}/#{version}' already exists. Skipping upload.")
-              return
-            else
-              err('This release version has already been uploaded')
-            end
-          end
-        end
+        Bosh::Common::Version::ReleaseVersion.parse(tarball.version) if new_director?
 
         begin
           if repack
-            package_matches = match_remote_packages(tarball.manifest)
+            if tarball.compiled_release?
+              package_matches = match_remote_compiled_packages(tarball.manifest)
+            else
+              package_matches = match_remote_packages(tarball.manifest)
+            end
 
             say('Checking if can repack release for faster upload...')
             repacked_path = tarball.repack(package_matches)
@@ -133,7 +134,8 @@ module Bosh::Cli::Command
           say("\nUploading release\n")
           report = 'Release uploaded'
         end
-        status, task_id = director.upload_release(tarball_path, rebase: rebase)
+
+        status, task_id = director.upload_release(tarball_path, {rebase: rebase})
         task_report(status, task_id, report)
       end
 
@@ -150,22 +152,21 @@ module Bosh::Cli::Command
         status, task_id = director.upload_remote_release(
           release_location,
           rebase: upload_options[:rebase],
-          skip_if_exists: upload_options[:skip_if_exists],
         )
         task_report(status, task_id, report)
       end
 
-      # if we aren't already in a release directory, try going up two levels
-      # to see if that is a release directory, and then use that as the base
       def find_release_dir(manifest_path)
-        unless in_release_dir?
-          dir = File.expand_path('../..', manifest_path)
-          Dir.chdir(dir)
-          if in_release_dir?
-            @release = Bosh::Cli::Release.new(dir, options[:final])
-          end
-        end
+        release_dir_for_final_manfiest = File.expand_path('../..', manifest_path)
+        release_dir_for_dev_manfiest = File.expand_path('../../..', manifest_path)
 
+        [
+          release_dir_for_final_manfiest,
+          release_dir_for_dev_manfiest
+        ].each do |release_dir|
+          @release_directory = release_dir
+          break if in_release_dir?
+        end
       end
 
       def get_remote_release(name)
@@ -190,7 +191,17 @@ module Bosh::Cli::Command
           'director or downgrade your CLI to 0.19.6'
 
         say(msg.make_yellow)
-        exit(1) unless confirmed?
+      end
+
+      def match_remote_compiled_packages(manifest_yaml)
+        director.match_compiled_packages(manifest_yaml)
+      rescue Bosh::Cli::DirectorError
+        msg = "You are using CLI >= 0.20 with director that doesn't support " +
+            "package matches.\nThis will result in uploading all packages " +
+            "and jobs to your director.\nIt is recommended to update your " +
+            'director or downgrade your CLI to 0.19.6'
+
+        say(msg.make_yellow)
       end
 
       def should_convert_to_old_format?(version)

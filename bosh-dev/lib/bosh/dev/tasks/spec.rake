@@ -5,6 +5,7 @@ require 'bosh/dev/bat_helper'
 require 'bosh/dev/sandbox/nginx'
 require 'bosh/dev/sandbox/workspace'
 require 'common/thread_pool'
+require 'bosh/dev/sandbox/services/uaa_service'
 require 'parallel_tests/tasks'
 
 namespace :spec do
@@ -17,9 +18,22 @@ namespace :spec do
 
     desc 'Install BOSH integration test dependencies (currently Nginx)'
     task :install_dependencies do
-      unless ENV['SKIP_NGINX'] == 'true'
-        nginx = Bosh::Dev::Sandbox::Nginx.new
-        nginx.install
+      unless ENV['SKIP_DEPS'] == 'true'
+        unless ENV['SKIP_NGINX'] == 'true'
+          nginx = Bosh::Dev::Sandbox::Nginx.new
+          retries = 3
+          begin
+            nginx.install
+          rescue
+            retries -= 1
+            retry if retries > 0
+            raise
+          end
+        end
+
+        unless ENV['SKIP_UAA'] == 'true'
+          Bosh::Dev::Sandbox::UaaService.install
+        end
       end
     end
 
@@ -45,7 +59,7 @@ namespace :spec do
         if spec_path
           "https_proxy= http_proxy= bundle exec rspec #{spec_path}"
         else
-          "https_proxy= http_proxy= bundle exec parallel_test '#{test_path}'#{count}#{group} --group-by filesize --type rspec"
+          "https_proxy= http_proxy= bundle exec parallel_test '#{test_path}'#{count}#{group} --group-by filesize --type rspec -o '--format documentation'"
         end
       end
       puts command
@@ -96,7 +110,7 @@ namespace :spec do
 
     task(:agent) do
       # Do not use exec because this task is part of other tasks
-      sh('go/src/github.com/cloudfoundry/bosh-agent/bin/test-unit')
+      sh('cd go/src/github.com/cloudfoundry/bosh-agent/ && bin/test-unit')
     end
   end
 

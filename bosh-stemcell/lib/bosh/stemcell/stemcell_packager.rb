@@ -40,7 +40,13 @@ module Bosh
           'version' => version.to_s,
           'bosh_protocol' => 1,
           'sha1' => image_checksum,
-          'cloud_properties' => {
+          'operating_system' => "#{definition.operating_system.name}-#{definition.operating_system.version}",
+          'cloud_properties' => manifest_cloud_properties(disk_format, infrastructure, stemcell_name)
+        }
+      end
+
+      def manifest_cloud_properties(disk_format, infrastructure, stemcell_name)
+        {
             'name' => stemcell_name,
             'version' => version.to_s,
             'infrastructure' => infrastructure.name,
@@ -51,8 +57,7 @@ module Bosh
             'os_type' => 'linux',
             'os_distro' => definition.operating_system.name,
             'architecture' => 'x86_64',
-          }.merge(infrastructure.additional_cloud_properties)
-        }
+        }.merge(infrastructure.additional_cloud_properties)
       end
 
       def create_tarball(disk_format)

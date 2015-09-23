@@ -18,7 +18,11 @@ module Bosh::Director::Models
     end
 
     def validate
-      validates_presence [:release_id, :name, :version, :blobstore_id, :sha1]
+      if !sha1.nil? || !blobstore_id.nil?
+        validates_presence [:sha1, :blobstore_id]
+      end
+
+      validates_presence [:release_id, :name, :version]
       validates_unique [:release_id, :name, :version]
       validates_format VALID_ID, [:name, :version]
     end

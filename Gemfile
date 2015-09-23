@@ -4,16 +4,13 @@ source 'https://rubygems.org'
 
 gem 'agent_client', path: 'agent_client'
 gem 'blobstore_client', path: 'blobstore_client'
-gem 'bosh_aws_cpi', path: 'bosh_aws_cpi'
 gem 'bosh_common', path: 'bosh_common'
 gem 'bosh-core', path: 'bosh-core'
 gem 'bosh_cpi', path: 'bosh_cpi'
 gem 'bosh_cli', path: 'bosh_cli'
 gem 'bosh_cli_plugin_aws', path: 'bosh_cli_plugin_aws'
 gem 'bosh_cli_plugin_micro', path: 'bosh_cli_plugin_micro'
-gem 'bosh_openstack_cpi', path: 'bosh_openstack_cpi'
 gem 'bosh-registry', path: 'bosh-registry'
-gem 'bosh_vsphere_cpi', path: 'bosh_vsphere_cpi'
 gem 'bosh-director', path: 'bosh-director'
 gem 'bosh-director-core', path: 'bosh-director-core'
 gem 'bosh-monitor', path: 'bosh-monitor'
@@ -21,6 +18,7 @@ gem 'bosh-release', path: 'bosh-release'
 gem 'bosh-template', path: 'bosh-template'
 gem 'simple_blobstore_server', path: 'simple_blobstore_server'
 
+gem 'bosh_aws_cpi', '~>2.0.1'
 gem 'rake', '~>10.0'
 
 group :production do
@@ -40,7 +38,7 @@ end
 group :development, :test do
   gem 'bosh-dev', path: 'bosh-dev'
   gem 'bosh-stemcell', path: 'bosh-stemcell'
-  gem 'serverspec'
+  gem 'serverspec', '0.15.4'
 
   gem 'rspec', '~> 3.0.0'
   gem 'rspec-its'
@@ -50,7 +48,7 @@ group :development, :test do
   gem 'parallel_tests'
   gem 'rack-test'
   gem 'webmock'
-  gem 'fakefs', git: 'https://github.com/pivotal-cf-experimental/fakefs.git', ref: 'ebde3d6c'
+  gem 'fakefs'
   gem 'simplecov', '~> 0.9.0'
   gem 'sinatra'
   gem 'sinatra-contrib'
@@ -61,7 +59,7 @@ group :development, :test do
   # Explicitly do not require serverspec dependency
   # so that it could be monkey patched in a deterministic way
   # in `bosh-stemcell/spec/support/serverspec_monkeypatch.rb`
-  gem 'specinfra', require: nil
+  gem 'specinfra', '1.15.0', require: nil
 
   # for director
   gem 'machinist', '~>1.0'

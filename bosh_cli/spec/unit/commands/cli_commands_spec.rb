@@ -1,5 +1,3 @@
-# Copyright (c) 2009-2012 VMware, Inc.
-
 require 'spec_helper'
 
 describe Bosh::Cli::Command::Base do
@@ -12,6 +10,7 @@ describe Bosh::Cli::Command::Base do
     @director = double(Bosh::Cli::Client::Director)
     allow(Bosh::Cli::Client::Director).to receive(:new).and_return(@director)
     allow(@director).to receive(:get_status).and_return('name' => 'ZB')
+    allow(misc_cmd).to receive(:show_current_state)
   end
 
   def misc_cmd
@@ -248,6 +247,7 @@ describe Bosh::Cli::Command::Base do
     describe 'listing releases' do
       before do
         allow(@cmd).to receive :nl
+        allow(@cmd).to receive(:show_current_state)
       end
 
       context "when the director doesn't include commit hash information (version < 1.5)" do

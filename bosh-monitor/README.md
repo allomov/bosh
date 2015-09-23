@@ -6,7 +6,6 @@ The Monitor also includes a few primary components:
 - The Agent Monitor maintains a record of known agents (by heartbeat event subscription)
 - The Director Monitor maintains a record of known agents (by director HTTP polling).
 - The Agent Analyzer that analyzes agent state periodically and generates Alerts.
-- The HTTP Server that responds to the /varz endpoint
 
 The Monitor also supports generic event processing plugins that respond to Heartbeats & Alerts.
 
@@ -45,7 +44,8 @@ Among the included plugins are:
 - DataDog - Sends various events to DataDog.com using their API
 - AWS CloudWatch - Sends various events to Amazon's CloudWatch using their API
 - Emailer - Sends configurable Emails on events reciept
-
+  Consul Event Forwarder - Sends heartbeats as events and TTL checks to a consul cluster
+  
 Plugins should conform to the following interface:
 
 | *Method* | *Arguments* | *Description* |

@@ -61,10 +61,13 @@ describe 'release lifecycle', type: :integration do
 
     bosh_runner.run("upload stemcell #{spec_asset('valid_stemcell.tgz')}")
 
+    cloud_config_manifest = yaml_file('cloud_manifest', Bosh::Spec::Deployments.simple_cloud_config)
+    bosh_runner.run("update cloud-config #{cloud_config_manifest.path}")
+
     manifest = Bosh::Spec::Deployments.simple_manifest
     manifest['releases'].first['version'] = 'latest'
 
-    deployment_manifest = yaml_file('simple', manifest)
+    deployment_manifest = yaml_file('deployment_manifest', manifest)
     bosh_runner.run("deployment #{deployment_manifest.path}")
 
     bosh_runner.run('deploy')
@@ -135,7 +138,7 @@ describe 'release lifecycle', type: :integration do
   end
 
   it 'verifies a sample valid release', no_reset: true do
-    release_filename = spec_asset('valid_release.tgz')
+    release_filename = spec_asset('test_release.tgz')
     out = bosh_runner.run("verify release #{release_filename}")
     expect(out).to match(regexp("`#{release_filename}' is a valid release"))
   end

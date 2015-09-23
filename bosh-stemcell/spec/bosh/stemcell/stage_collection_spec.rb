@@ -28,45 +28,23 @@ module Bosh::Stemcell
               :base_apt,
               :base_ubuntu_build_essential,
               :base_ubuntu_packages,
+              :base_file_permission,
               :base_ssh,
-              :bosh_dpkg_list,
               :bosh_sysstat,
               :system_kernel,
+              :system_kernel_modules,
+              :system_ixgbevf,
               :bosh_sysctl,
               :bosh_users,
               :bosh_monit,
               :bosh_ntpdate,
               :bosh_sudoers,
-              :rsyslog_build,
               :rsyslog_config,
               :delay_monit_start,
               :system_grub,
               :vim_tiny,
               :cron_config,
-            ]
-          )
-        end
-      end
-
-      context 'when CentOS 6' do
-        let(:operating_system) { OperatingSystem.for('centos', '6') }
-
-        it 'has the correct stages' do
-          expect(stage_collection.operating_system_stages).to eq(
-            [
-              :base_centos,
-              :base_centos_packages,
-              :base_ssh,
-              :bosh_sysctl,
-              :bosh_users,
-              :bosh_monit,
-              :bosh_ntpdate,
-              :bosh_sudoers,
-              :rsyslog_build,
-              :rsyslog_config,
-              :delay_monit_start,
-              :system_grub,
-              :cron_config,
+              :escape_ctrl_alt_del,
             ]
           )
         end
@@ -80,7 +58,10 @@ module Bosh::Stemcell
             [
               :base_centos,
               :base_centos_packages,
+              :base_file_permission,
               :base_ssh,
+              :system_kernel_modules,
+              :system_ixgbevf,
               :bosh_sysctl,
               :bosh_users,
               :bosh_monit,
@@ -90,6 +71,7 @@ module Bosh::Stemcell
               :delay_monit_start,
               :system_grub,
               :cron_config,
+              :escape_ctrl_alt_del,
             ]
           )
         end
@@ -103,7 +85,9 @@ module Bosh::Stemcell
             [
               :base_rhel,
               :base_centos_packages,
+              :base_file_permission,
               :base_ssh,
+              :system_kernel_modules,
               :bosh_sysctl,
               :bosh_users,
               :bosh_monit,
@@ -159,9 +143,11 @@ module Bosh::Stemcell
             :bosh_harden,
             :bosh_disable_password_authentication,
             :bosh_aws_agent_settings,
+            :disable_blank_passwords,
             :image_create,
             :image_install_grub,
             :image_aws_update_grub,
+            :bosh_package_list
           ]
         }
 
@@ -206,8 +192,10 @@ module Bosh::Stemcell
                 :bosh_harden,
                 :bosh_disable_password_authentication,
                 :bosh_openstack_agent_settings,
+                :disable_blank_passwords,
                 :image_create,
                 :image_install_grub,
+                :bosh_package_list
               ]
             )
             expect(stage_collection.package_stemcell_stages('qcow2')).to eq(
@@ -232,8 +220,10 @@ module Bosh::Stemcell
                 :bosh_harden,
                 :bosh_disable_password_authentication,
                 :bosh_openstack_agent_settings,
+                :disable_blank_passwords,
                 :image_create,
                 :image_install_grub,
+                :bosh_package_list
               ]
             )
             expect(stage_collection.package_stemcell_stages('qcow2')).to eq(
@@ -255,13 +245,16 @@ module Bosh::Stemcell
             expect(stage_collection.build_stemcell_image_stages).to eq(
               [
                 :system_network,
+                :system_open_vm_tools,
                 :system_vsphere_cdrom,
                 :system_parameters,
                 :bosh_clean,
                 :bosh_harden,
                 :bosh_vsphere_agent_settings,
+                :disable_blank_passwords,
                 :image_create,
                 :image_install_grub,
+                :bosh_package_list
               ]
             )
             expect(stage_collection.package_stemcell_stages('ovf')).to eq(vmware_package_stemcell_steps)
@@ -281,8 +274,10 @@ module Bosh::Stemcell
                 :bosh_clean,
                 :bosh_harden,
                 :bosh_vsphere_agent_settings,
+                :disable_blank_passwords,
                 :image_create,
                 :image_install_grub,
+                :bosh_package_list
               ]
             )
             expect(stage_collection.package_stemcell_stages('ovf')).to eq(vmware_package_stemcell_steps)
@@ -306,9 +301,11 @@ module Bosh::Stemcell
                 :bosh_clean,
                 :bosh_harden,
                 :bosh_vsphere_agent_settings,
+                :disable_blank_passwords,
                 :image_create,
                 :image_install_grub,
-              ]
+                :bosh_package_list,
+            ]
             )
             expect(stage_collection.package_stemcell_stages('ovf')).to eq(vmware_package_stemcell_steps)
           end
@@ -321,13 +318,16 @@ module Bosh::Stemcell
             expect(stage_collection.build_stemcell_image_stages).to eq(
               [
                 :system_network,
+                :system_open_vm_tools,
                 :system_vsphere_cdrom,
                 :system_parameters,
                 :bosh_clean,
                 :bosh_harden,
                 :bosh_vsphere_agent_settings,
+                :disable_blank_passwords,
                 :image_create,
                 :image_install_grub,
+                :bosh_package_list,
               ]
             )
             expect(stage_collection.package_stemcell_stages('ovf')).to eq(vmware_package_stemcell_steps)

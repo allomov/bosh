@@ -7,7 +7,7 @@ module Bosh::Dev::Sandbox
     ASSETS_DIR = File.expand_path('bosh-dev/assets/sandbox', REPO_ROOT)
     DIRECTOR_UUID = 'deadbeef'
 
-    DIRECTOR_CONFIG = 'director_test.yml'
+    DEFAULT_DIRECTOR_CONFIG = 'director_test.yml'
     DIRECTOR_CONF_TEMPLATE = File.join(ASSETS_DIR, 'director_test.yml.erb')
 
     DIRECTOR_PATH = File.expand_path('bosh-director', REPO_ROOT)
@@ -18,13 +18,14 @@ module Bosh::Dev::Sandbox
       @director_tmp_path = director_tmp_path
       @director_config = director_config
 
+      log_location = "#{base_log_path}.director.out"
       @process = Service.new(
         %W[bosh-director -c #{@director_config}],
-        {output: "#{base_log_path}.director.out"},
+        {output: log_location},
         @logger,
       )
 
-      @socket_connector = SocketConnector.new('director', 'localhost', director_port, @logger)
+      @socket_connector = SocketConnector.new('director', 'localhost', director_port, log_location, @logger)
 
       @worker_processes = 3.times.map do |index|
         Service.new(
@@ -75,15 +76,36 @@ module Bosh::Dev::Sandbox
 
     def start_workers
       @worker_processes.each(&:start)
+      attempt = 0
+      delay = 0.5
+      timeout = 60 * 5
+      max_attempts = timeout/delay
+
       until resque_is_ready?
-        @logger.debug('Waiting for Resque workers to start')
-        sleep 0.5
+        if attempt > max_attempts
+           raise "Resque failed to start workers in #{timeout} seconds"
+        end
+
+        attempt += 1
+        sleep delay
       end
     end
 
     def stop_workers
       @logger.debug('Waiting for Resque queue to drain...')
-      sleep 0.1 until resque_is_done?
+      attempt = 0
+      delay = 0.1
+      timeout = 60
+      max_attempts = timeout/delay
+
+      until resque_is_done?
+        if attempt > max_attempts
+          raise "Resque queue failed to drain in #{timeout} seconds"
+        end
+
+        attempt += 1
+        sleep delay
+      end
       @logger.debug('Resque queue drained')
 
       Redis.new(host: 'localhost', port: @redis_port).flushdb

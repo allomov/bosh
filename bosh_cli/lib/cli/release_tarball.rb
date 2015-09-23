@@ -4,20 +4,32 @@ module Bosh::Cli
     include DependencyHelper
 
     attr_reader :release_name, :jobs, :packages, :version
-    attr_reader :skipped # Mostly for tests
+    attr_reader :skipped, :unpack_dir # Mostly for tests
 
     def initialize(tarball_path)
       @tarball_path = File.expand_path(tarball_path, Dir.pwd)
       @unpack_dir   = Dir.mktmpdir
       @jobs = []
       @packages = []
+
+      if compiled_release?
+        @packages_folder = "compiled_packages"
+      else
+        @packages_folder = "packages"
+      end
     end
 
     # Unpacks tarball to @unpack_dir, returns true if succeeded, false if failed
     def unpack
       return @unpacked unless @unpacked.nil?
-      `tar -C #{@unpack_dir} -xzf #{@tarball_path} 2>&1`
-      @unpacked = $?.exitstatus == 0
+      exit_success = system("tar", "-C", @unpack_dir, "-xzf", @tarball_path, out: "/dev/null", err: "/dev/null")
+      @unpacked = !!exit_success
+    end
+
+    # Creates a new tarball from the current contents of @unpack_dir
+    def create_from_unpacked(target_path)
+      raise "Not unpacked yet!" unless @unpacked
+      !!system("tar", "-C", @unpack_dir, "-pczf", File.expand_path(target_path), ".", out: "/dev/null", err: "/dev/null")
     end
 
     def exists?
@@ -28,6 +40,35 @@ module Bosh::Cli
       return nil unless valid?
       unpack
       File.read(File.join(@unpack_dir, "release.MF"))
+    end
+
+    def compiled_release?
+      unpack
+      File.exists?(File.expand_path("compiled_packages", @unpack_dir))
+    end
+
+    def replace_manifest(hash)
+      return nil unless valid?
+      unpack
+      write_yaml(hash, File.join(@unpack_dir, "release.MF"))
+    end
+
+    def job_tarball_path(name)
+      return nil unless valid?
+      unpack
+      File.join(@unpack_dir, 'jobs', "#{name}.tgz")
+    end
+
+    def package_tarball_path(name)
+      return nil unless valid?
+      unpack
+      File.join(@unpack_dir, 'packages', "#{name}.tgz")
+    end
+
+    def license_resource
+      return nil unless valid?
+      unpack
+      return Resources::License.new(@unpack_dir)
     end
 
     def convert_to_old_format
@@ -45,8 +86,8 @@ module Bosh::Cli
       repacked_path = File.join(tmpdir, 'release-reformat.tgz')
 
       Dir.chdir(@unpack_dir) do
-        `tar -czf #{repacked_path} . 2>&1`
-        return repacked_path if $? == 0
+        exit_success = system("tar", "-czf", repacked_path, ".", out: "/dev/null", err: "/dev/null")
+        return repacked_path if exit_success
       end
     end
 
@@ -61,7 +102,7 @@ module Bosh::Cli
 
       manifest = load_yaml_file(File.join(@unpack_dir, "release.MF"))
 
-      local_packages = manifest["packages"]
+      local_packages = manifest[@packages_folder]
       local_jobs = manifest["jobs"]
 
       @skipped = 0
@@ -69,7 +110,8 @@ module Bosh::Cli
       Dir.chdir(@unpack_dir) do
         local_packages.each do |package|
           say("#{package["name"]} (#{package["version"]})".ljust(30), " ")
-          if package_matches.include?(package["sha1"]) ||
+
+          if  package_matches and package_matches.include?(package["sha1"]) ||
              (package["fingerprint"] &&
               package_matches.include?(package["fingerprint"]))
             say("SKIP".make_green)
@@ -86,8 +128,8 @@ module Bosh::Cli
         end
 
         return nil if @skipped == 0
-        `tar -czf #{repacked_path} . 2>&1`
-        return repacked_path if $? == 0
+        exit_success = system("tar", "-czf", repacked_path, ".", out: "/dev/null", err: "/dev/null")
+        return repacked_path if exit_success
       end
     end
 
@@ -95,10 +137,8 @@ module Bosh::Cli
     # and packages in place when we do validation. However for jobs and packages
     # that are present we still need to validate checksums
     def perform_validation(options = {})
-      # CLEANUP this syntax
-      allow_sparse = options.has_key?(:allow_sparse) ?
-          !!options[:allow_sparse] :
-          false
+      allow_sparse = options.fetch(:allow_sparse, false)
+      should_print_release_info = options.fetch(:print_release_info, true)
 
       step("File exists and readable",
            "Cannot find release file #{@tarball_path}", :fatal) do
@@ -129,15 +169,14 @@ module Bosh::Cli
       @version = manifest["version"].to_s
 
       # Check packages
-      total_packages = manifest["packages"].size
+      total_packages = manifest[@packages_folder].size
       available_packages = {}
 
-      manifest["packages"].each_with_index do |package, i|
+      manifest[@packages_folder].each_with_index do |package, i|
         @packages << package
         name, version = package['name'], package['version']
 
-        package_file   = File.expand_path(name + ".tgz",
-                                          @unpack_dir + "/packages")
+        package_file   = File.expand_path(name + ".tgz", File.join(@unpack_dir, @packages_folder))
         package_exists = File.exists?(package_file)
 
         step("Read package '%s' (%d of %d)" % [name, i+1, total_packages],
@@ -162,7 +201,7 @@ module Bosh::Cli
         step("Package dependencies",
              "Package dependencies couldn't be resolved") do
           begin
-            tsort_packages(manifest["packages"].inject({}) { |h, p|
+            tsort_packages(manifest[@packages_folder].inject({}) { |h, p|
               h[p["name"]] = p["dependencies"] || []; h })
             true
           rescue Bosh::Cli::CircularDependency,
@@ -204,8 +243,7 @@ module Bosh::Cli
 
           job_tmp_dir = Dir.mktmpdir
           FileUtils.mkdir_p(job_tmp_dir)
-          `tar -C #{job_tmp_dir} -xzf #{job_file} 2>&1`
-          job_extracted = $?.exitstatus == 0
+          job_extracted = !!system("tar", "-C", job_tmp_dir, "-xzf", job_file, out: "/dev/null", err: "/dev/null")
 
           step("Extract job '#{name}'", "Cannot extract job '#{name}'") do
             job_extracted
@@ -252,7 +290,44 @@ module Bosh::Cli
         end
       end
 
-      print_info(manifest)
+      print_info(manifest) if should_print_release_info
+    end
+
+    class TarballArtifact
+      def initialize(info)
+        @name = info['name']
+        @version = info['version']
+      end
+
+      attr_reader :name, :version
+
+      def new_version?
+        false
+      end
+    end
+
+    def license
+      m = Psych.load(manifest)
+      license = m['license']
+      return nil if !license
+      license['name'] = 'license'
+      TarballArtifact.new(license)
+    end
+
+    def packages
+      m = Psych.load(manifest)
+      packages = m['packages'] || []
+      packages.map { |pkg| TarballArtifact.new(pkg) }
+    end
+
+    def jobs
+      m = Psych.load(manifest)
+      jobs = m['jobs'] || []
+      jobs.map { |job| TarballArtifact.new(job) }
+    end
+
+    def affected_jobs
+      []
     end
 
     def print_info(manifest)
@@ -264,11 +339,11 @@ module Bosh::Cli
 
       say("\nPackages")
 
-      if manifest["packages"].empty?
+      if manifest[@packages_folder].empty?
         say("  - none")
       end
 
-      for package in manifest["packages"]
+      for package in manifest[@packages_folder]
         say("  - #{package["name"]} (#{package["version"]})")
       end
 

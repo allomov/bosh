@@ -5,6 +5,7 @@ describe 'CentOS 7 OS image', os_image: true do
   it_behaves_like 'a CentOS or RHEL based OS image'
   it_behaves_like 'a systemd-based OS image'
   it_behaves_like 'a Linux kernel 3.x based OS image'
+  it_behaves_like 'a Linux kernel module configured OS image'
 
   context 'installed by base_centos' do
     describe file('/etc/locale.conf') do
@@ -43,8 +44,10 @@ describe 'CentOS 7 OS image', os_image: true do
       libxslt-devel
       lsof
       NetworkManager
+      net-tools
       nmap-ncat
       openssh-server
+      openssl
       openssl-devel
       parted
       psmisc
@@ -72,11 +75,28 @@ describe 'CentOS 7 OS image', os_image: true do
         it { should be_installed }
       end
     end
+
+    describe file('/usr/sbin/ifconfig') do
+      it { should be_executable }
+    end
   end
 
   context 'installed by system_grub' do
     describe package('grub2-tools') do
       it { should be_installed }
+    end
+  end
+
+  context 'overriding control alt delete (stig: V-38668)' do
+    describe file('/etc/systemd/system/ctrl-alt-del.target') do
+      it { should be_file }
+      it { should contain '# escaping ctrl alt del' }
+    end
+  end
+
+  context 'official Centos gpg key is installed (stig: V-38476)' do
+    describe command('rpm -qa gpg-pubkey* 2>/dev/null | xargs rpm -qi 2>/dev/null') do
+      its (:stdout) { should include('CentOS 7 Official Signing Key') }
     end
   end
 end

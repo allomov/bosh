@@ -13,27 +13,32 @@ mkdir -p $chroot/var/vcap/monit/svlog
 # Set up agent and monit with runit
 run_in_bosh_chroot $chroot "
 chmod +x /etc/sv/agent/run /etc/sv/agent/log/run
+rm -f /etc/service/agent
 ln -s /etc/sv/agent /etc/service/agent
 
 chmod +x /etc/sv/monit/run /etc/sv/monit/log/run
+rm -f /etc/service/monit
 ln -s /etc/sv/monit /etc/service/monit
 "
 
 # Alerts for monit config
 cp -a $dir/assets/alerts.monitrc $chroot/var/vcap/monit/alerts.monitrc
 
-cd $assets_dir/go/src/github.com/cloudfoundry/bosh-agent
+agent_dir=$assets_dir/go/src/github.com/cloudfoundry/bosh-agent
 
+cd $agent_dir
 bin/build
-
 mv out/bosh-agent $chroot/var/vcap/bosh/bin/
 cp Tools/bosh-agent-rc $chroot/var/vcap/bosh/bin/
+cp mbus/agent.{cert,key} $chroot/var/vcap/bosh/
+
+cd $assets_dir/go/src/github.com/cloudfoundry/bosh-davcli
+bin/build
 mv out/dav-cli $chroot/var/vcap/bosh/bin/bosh-blobstore-dav
+
 chmod +x $chroot/var/vcap/bosh/bin/bosh-agent
 chmod +x $chroot/var/vcap/bosh/bin/bosh-agent-rc
 chmod +x $chroot/var/vcap/bosh/bin/bosh-blobstore-dav
-
-cp mbus/agent.{cert,key} $chroot/var/vcap/bosh/
 
 # Setup additional permissions
 run_in_chroot $chroot "
