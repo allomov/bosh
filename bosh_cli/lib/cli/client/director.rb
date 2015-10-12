@@ -35,6 +35,7 @@ module Bosh
           @track_tasks         = !options.delete(:no_track)
           @num_retries         = options.fetch(:num_retries, 5)
           @retry_wait_interval = options.fetch(:retry_wait_interval, 5)
+          @ca_cert             = options[:ca_cert]
         end
 
         def uuid
@@ -89,7 +90,7 @@ module Bosh
           options                = options.dup
           options[:content_type] = 'application/x-compressed'
 
-          upload_and_track(:post, '/stemcells', filename, options)
+          upload_and_track(:post, stemcells_path(options), filename, options)
         end
 
         def upload_remote_stemcell(stemcell_location, options = {})
@@ -98,7 +99,7 @@ module Bosh
           options[:payload]      = JSON.generate(payload)
           options[:content_type] = 'application/json'
 
-          request_and_track(:post, '/stemcells', options)
+          request_and_track(:post, stemcells_path(options), options)
         end
 
         def get_version
@@ -292,6 +293,7 @@ module Bosh
 
           options[:payload]      = JSON.generate(payload)
           options[:content_type] = 'application/json'
+          options[:task_success_state] = :queued
 
           request_and_track(:post, url, options)
         end
@@ -643,6 +645,12 @@ module Bosh
           path
         end
 
+        def stemcells_path(options = {})
+          path = '/stemcells'
+          path << "?fix=true" if options[:fix]
+          path
+        end
+
         def request(method, uri, content_type = nil, payload = nil, headers = {}, options = {})
           headers = headers.dup
           headers['Content-Type'] = content_type if content_type
@@ -721,15 +729,45 @@ module Bosh
           end
         end
 
+        def generate_http_client
+          @http_client ||= HTTPClient.new.tap do |http_client|
+            http_client.send_timeout    = API_TIMEOUT
+            http_client.receive_timeout = API_TIMEOUT
+            http_client.connect_timeout = CONNECT_TIMEOUT
+          end
+        end
+
         def perform_http_request(method, uri, payload = nil, headers = {}, &block)
-          http_client = HTTPClient.new
+          http_client = generate_http_client
 
-          http_client.send_timeout    = API_TIMEOUT
-          http_client.receive_timeout = API_TIMEOUT
-          http_client.connect_timeout = CONNECT_TIMEOUT
+          if @ca_cert.nil?
+            http_client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE
+            http_client.ssl_config.verify_callback = Proc.new {}
+          else
+            unless File.exists?(@ca_cert)
+              err('Invalid ca certificate path')
+            end
 
-          http_client.ssl_config.verify_mode     = OpenSSL::SSL::VERIFY_NONE
-          http_client.ssl_config.verify_callback = Proc.new {}
+            parsed_url = nil
+            begin
+              parsed_url = URI.parse(uri)
+            rescue => e
+              err("Failed to parse director URL: #{e.message}")
+            end
+
+            unless parsed_url.instance_of?(URI::HTTPS)
+              err('CA certificate cannot be used with HTTP protocol')
+            end
+
+            # pass in client certificate
+            begin
+              cert_store = OpenSSL::X509::Store.new
+              cert_store.add_file(@ca_cert)
+            rescue OpenSSL::X509::StoreError => e
+              err("Invalid SSL Cert for '#{uri}': #{e.message}")
+            end
+            http_client.ssl_config.cert_store = cert_store
+          end
 
           if @credentials
             headers['Authorization'] = @credentials.authorization_header
@@ -750,6 +788,10 @@ module Bosh
                HTTPClient::KeepAliveDisconnected,
                OpenSSL::SSL::SSLError,
                OpenSSL::X509::StoreError => e
+
+          if e.is_a?(OpenSSL::SSL::SSLError) && e.message.include?('certificate verify failed')
+            err("Invalid SSL Cert for '#{uri}': #{e.message}")
+          end
           raise DirectorInaccessible, "cannot access director (#{e.message})"
 
         rescue HTTPClient::BadResponseError => e

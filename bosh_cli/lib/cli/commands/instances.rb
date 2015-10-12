@@ -7,6 +7,7 @@ module Bosh::Cli::Command
     option '--details', 'Return detailed instance information'
     option '--dns', 'Return instance DNS A records'
     option '--vitals', 'Return instance vitals information'
+    option '--ps', "Return instance process information"
     def list()
       auth_required
       deployment_required
@@ -65,6 +66,7 @@ module Bosh::Cli::Command
         end
         t.headings = headings
 
+        s = instances.size
         sorted.each do |instance|
           job = "#{instance['job_name'] || 'unknown'}/#{instance['index'] || 'unknown'}"
           ips = Array(instance['ips']).join("\n")
@@ -115,6 +117,17 @@ module Bosh::Cli::Command
           end
 
           t << row
+          s -= 1
+          if options[:ps] && instance['processes']
+            instance['processes'].each do |process|
+              name = process['name']
+              state = process['state']
+              process_row = ["  #{name}", "#{state}"]
+              (headings.size - 2).times { process_row << '' }
+              t << process_row
+            end
+            t << :separator if s > 0
+          end
         end
       end
 

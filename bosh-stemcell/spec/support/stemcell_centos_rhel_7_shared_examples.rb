@@ -1,5 +1,9 @@
 shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
 
+  describe command('ls -1 /lib/modules | wc -l') do
+    its(:stdout) {should eq "1\n"}
+  end
+
   context 'installed by image_install_grub', exclude_on_warden: true do
     describe file('/etc/fstab') do
       it { should be_file }
@@ -13,8 +17,14 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
       it { should contain 'selinux=0' }
       it { should contain 'plymouth.enable=0' }
       it { should_not contain 'xen_blkfront.sda_is_xvda=1'}
-      # single-user mode boot should be disabled (stig: V-38586)
-      it { should_not contain 'single' }
+      it('single-user mode boot should be disabled (stig: V-38586)') { should_not contain 'single' }
+
+      it('should set the user name and password for grub menu (stig: V-38585)') { should contain 'set superusers=vcap' }
+      it('should set the user name and password for grub menu (stig: V-38585)') { should contain /^password_pbkdf2 vcap grub.pbkdf2.sha512.*/ }
+
+      it('should be of mode 600 (stig: V-38583)') { should be_mode('600') }
+      it('should be owned by root (stig: V-38579)') { should be_owned_by('root') }
+      it('should be grouped into root (stig: V-38581)') { should be_grouped_into('root') }
     end
 
     # GRUB 0.97 configuration (used only on Amazon PV hosts) must have same kernel params as GRUB 2
@@ -23,6 +33,10 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
       it { should contain 'selinux=0' }
       it { should contain 'plymouth.enable=0' }
       it { should_not contain 'xen_blkfront.sda_is_xvda=1'}
+
+      it('should be of mode 600 (stig: V-38583)') { should be_mode('600') }
+      it('should be owned by root (stig: V-38579)') { should be_owned_by('root') }
+      it('should be grouped into root (stig: V-38581)') { should be_grouped_into('root') }
     end
   end
 

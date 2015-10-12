@@ -12,11 +12,13 @@ module Bosh::Dev::Sandbox
 
     DIRECTOR_PATH = File.expand_path('bosh-director', REPO_ROOT)
 
-    def initialize(director_port, redis_port, base_log_path, director_tmp_path, director_config, logger)
-      @redis_port = redis_port
+    def initialize(options, logger)
+      @database = options[:database]
+      @redis_port = options[:redis_port]
       @logger = logger
-      @director_tmp_path = director_tmp_path
-      @director_config = director_config
+      @director_tmp_path = options[:director_tmp_path]
+      @director_config = options[:director_config]
+      base_log_path = options[:base_log_path]
 
       log_location = "#{base_log_path}.director.out"
       @process = Service.new(
@@ -25,7 +27,7 @@ module Bosh::Dev::Sandbox
         @logger,
       )
 
-      @socket_connector = SocketConnector.new('director', 'localhost', director_port, log_location, @logger)
+      @socket_connector = SocketConnector.new('director', 'localhost', options[:director_port], log_location, @logger)
 
       @worker_processes = 3.times.map do |index|
         Service.new(
@@ -83,7 +85,8 @@ module Bosh::Dev::Sandbox
 
       until resque_is_ready?
         if attempt > max_attempts
-           raise "Resque failed to start workers in #{timeout} seconds"
+          @logger.error("Resque queue failed to start in #{timeout} seconds. Resque.info: #{Resque.info.pretty_inspect}")
+          raise "Resque failed to start workers in #{timeout} seconds"
         end
 
         attempt += 1
@@ -100,6 +103,13 @@ module Bosh::Dev::Sandbox
 
       until resque_is_done?
         if attempt > max_attempts
+          @logger.error("Resque queue failed to drain in #{timeout} seconds. Resque.info: #{Resque.info.pretty_inspect}")
+          @database.current_tasks.each do |current_task|
+            @logger.error("#{DEBUG_HEADER} Current task '#{current_task[:description]}' #{DEBUG_HEADER}:")
+            @logger.error(File.read(File.join(current_task[:output], 'debug')))
+            @logger.error("#{DEBUG_HEADER} End of task '#{current_task[:description]}' #{DEBUG_HEADER}:")
+          end
+
           raise "Resque queue failed to drain in #{timeout} seconds"
         end
 
