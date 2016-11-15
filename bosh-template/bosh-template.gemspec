@@ -20,9 +20,5 @@ Gem::Specification.new do |spec|
   spec.bindir       = 'bin'
   spec.executables << 'bosh-template'
 
-  spec.add_dependency 'semi_semantic', '~>1.1.0'
-
-  spec.add_development_dependency 'rake'
-  spec.add_development_dependency 'rspec'
-  spec.add_development_dependency 'rspec-its'
+  spec.add_dependency 'semi_semantic', '~>1.2.0'
 end

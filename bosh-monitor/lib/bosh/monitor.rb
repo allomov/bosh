@@ -31,6 +31,8 @@ require 'bosh/monitor/yaml_helper'
 
 # Basic blocks
 require 'bosh/monitor/agent'
+require 'bosh/monitor/instance'
+require 'bosh/monitor/deployment'
 require 'bosh/monitor/auth_provider'
 require 'bosh/monitor/config'
 require 'bosh/monitor/core_ext'
@@ -42,7 +44,7 @@ require 'bosh/monitor/runner'
 require 'bosh/monitor/version'
 
 # Processing
-require 'bosh/monitor/agent_manager'
+require 'bosh/monitor/instance_manager'
 require 'bosh/monitor/event_processor'
 
 # HTTP endpoints
@@ -73,6 +75,7 @@ require 'bosh/monitor/plugins/logger'
 require 'bosh/monitor/plugins/nats'
 require 'bosh/monitor/plugins/pagerduty'
 require 'bosh/monitor/plugins/resurrector'
+require 'bosh/monitor/plugins/riemann'
 require 'bosh/monitor/plugins/tsdb'
 require 'bosh/monitor/plugins/consul_event_forwarder'
 require 'bosh/monitor/plugins/syslog_event_forwarder'

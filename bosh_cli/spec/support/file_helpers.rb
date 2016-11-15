@@ -26,6 +26,10 @@ module Support
       `tar -ztf #{tarball_path}`.chomp.split(/\n/).reject {|f| f =~ /\/$/ }
     end
 
+    def list_tar_content(tarball_path)
+      `tar -ztf #{tarball_path}`.chomp.split(/\n/)
+    end
+
     def file_mode(file)
       File.stat(file).mode.to_s(8)[-4..-1]
     end
@@ -102,6 +106,8 @@ module Support
       def git_init
         Dir.chdir(@path) do
           `git init`
+          `git config user.name "Fake User"`
+          `git config user.email fake-user@example.com`
           `git add -A`
           `git commit -m 'initial commit'`
         end
@@ -174,6 +180,15 @@ module Support
 
       def remove_files(subdir, filepaths)
         filepaths.each { |filepath| remove_file(subdir, filepath) }
+      end
+
+      private
+
+      def get_tmp_file_path(content)
+        tmp_file = File.open(File.join(Dir.mktmpdir, 'tmp'), 'w')
+        tmp_file.write(content)
+        tmp_file.close
+        tmp_file.path
       end
     end
   end

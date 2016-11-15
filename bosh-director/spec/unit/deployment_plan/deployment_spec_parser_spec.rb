@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'bosh/director/dns_helper'
 
 module Bosh::Director
   describe DeploymentPlan::DeploymentSpecParser do
@@ -10,7 +9,8 @@ module Bosh::Director
     let(:cloud_config) { Models::CloudConfig.make }
 
     describe '#parse' do
-      let(:parsed_deployment) { subject.parse(manifest_hash) }
+      let(:options) { {} }
+      let(:parsed_deployment) { subject.parse(manifest_hash, options) }
       let(:deployment_model) { Models::Deployment.make }
       let(:manifest_hash) do
         {
@@ -45,6 +45,103 @@ module Bosh::Director
           manifest_hash.merge!('name' => 'Name with spaces')
           expect(parsed_deployment.canonical_name).to eq('namewithspaces')
         end
+      end
+
+      describe 'stemcells' do
+        context 'when no top level stemcells' do
+          before do
+            manifest_hash.delete('stemcells')
+          end
+
+          it 'should not error out' do
+            expect(parsed_deployment.stemcells).to eq({})
+          end
+        end
+
+        context 'when there 1 stemcell' do
+          before do
+            stemcell_hash1 = {'alias' => 'stemcell1', 'name' => 'bosh-aws-xen-hvm-ubuntu-trusty-go_agent', 'version' => '1234' }
+            manifest_hash['stemcells'] = [stemcell_hash1]
+          end
+
+          it 'should not error out' do
+            expect(parsed_deployment.stemcells.count).to eq(1)
+          end
+
+          it 'should error out if stemcell hash does not have alias' do
+            manifest_hash['stemcells'].first.delete('alias')
+            expect {
+              parsed_deployment.stemcells
+            }.to raise_error Bosh::Director::ValidationMissingField,
+                "Required property 'alias' was not specified in object " +
+                  '({"name"=>"bosh-aws-xen-hvm-ubuntu-trusty-go_agent", "version"=>"1234"})'
+          end
+        end
+
+        context 'when there are stemcells with duplicate alias' do
+          before do
+            stemcell_hash1 = {'alias' => 'stemcell1', 'name' => 'bosh-aws-xen-hvm-ubuntu-trusty-go_agent', 'version' => '1234' }
+            manifest_hash['stemcells'] = [stemcell_hash1, stemcell_hash1]
+          end
+
+          it 'errors out when alias of stemcells are not unique' do
+            expect {
+              parsed_deployment.stemcells
+            }.to raise_error Bosh::Director::StemcellAliasAlreadyExists, "Duplicate stemcell alias 'stemcell1'"
+          end
+        end
+
+        context 'when there are stemcells with no OS nor name' do
+          before do
+            stemcell_hash1 = {'alias' => 'stemcell1', 'version' => '1234' }
+            manifest_hash['stemcells'] = [stemcell_hash1]
+          end
+
+          it 'errors out' do
+            expect {
+              parsed_deployment.stemcells
+            }.to raise_error Bosh::Director::ValidationMissingField
+          end
+        end
+
+        context 'when there are stemcells with OS' do
+          before do
+            stemcell_hash1 = {'alias' => 'stemcell1', 'os' => 'ubuntu-trusty', 'version' => '1234' }
+            manifest_hash['stemcells'] = [stemcell_hash1]
+          end
+
+          it 'should not errors out' do
+            expect(parsed_deployment.stemcells.count).to eq(1)
+            expect(parsed_deployment.stemcells['stemcell1'].os).to eq('ubuntu-trusty')
+          end
+        end
+
+        context 'when there are stemcells with both name and OS' do
+          before do
+            stemcell_hash1 = {'alias' => 'stemcell1', 'name' => 'bosh-aws-xen-hvm-ubuntu-trusty-go_agent', 'os' => 'ubuntu-trusty', 'version' => '1234' }
+            manifest_hash['stemcells'] = [stemcell_hash1]
+          end
+
+          it 'errors out' do
+            expect {
+              parsed_deployment.stemcells
+            }.to raise_error Bosh::Director::StemcellBothNameAndOS
+          end
+        end
+
+        context 'when there are 2 stemcells' do
+          before do
+            stemcell_hash0 = {'alias' => 'stemcell0', 'name' => 'bosh-aws-xen-hvm-ubuntu-trusty-go_agent', 'version' => '1234' }
+            stemcell_hash1 = {'alias' => 'stemcell1', 'name' => 'bosh-aws-xen-hvm-ubuntu-trusty-go_agent', 'version' => '1234' }
+            manifest_hash['stemcells'] = [stemcell_hash0, stemcell_hash1]
+          end
+
+          it 'should add stemcells to deployment plan' do
+            expect(parsed_deployment.stemcells.count).to eq(2)
+          end
+        end
+
+
       end
 
       describe 'properties key' do
@@ -161,7 +258,7 @@ module Bosh::Director
               parsed_deployment
             }.to raise_error(
               ValidationMissingField,
-              /Required property `releases' was not specified in object .+/,
+              /Required property 'releases' was not specified in object .+/,
             )
           end
         end
@@ -180,6 +277,25 @@ module Bosh::Director
 
             expect(parsed_deployment.update).to eq(update)
           end
+
+          context 'when canaries value is present in options' do
+              let(:options) { { 'canaries'=> '42' } }
+              it "replaces canaries value from job's update section with option's value" do
+                expect(DeploymentPlan::UpdateConfig).to receive(:new)
+                  .with( {'foo'=> 'bar', 'canaries' => '42'} )
+                  .and_return(update_config)
+                parsed_deployment.update
+              end
+          end
+          context 'when max_in_flight value is present in options' do
+            let(:options) { { 'max_in_flight'=> '42' } }
+            it "replaces max_in_flight value from job's update section with option's value" do
+              expect(DeploymentPlan::UpdateConfig).to receive(:new)
+                .with( {'foo'=> 'bar', 'max_in_flight' => '42'} )
+                .and_return(update_config)
+              parsed_deployment.update
+            end
+          end
         end
 
         context 'when update section is not specified' do
@@ -190,155 +306,180 @@ module Bosh::Director
               parsed_deployment
             }.to raise_error(
               ValidationMissingField,
-              /Required property `update' was not specified in object .+/,
+              /Required property 'update' was not specified in object .+/,
             )
           end
         end
       end
 
-      describe 'jobs key' do
+      shared_examples_for 'jobs/instance_groups key' do
         context 'when there is at least one job' do
-          before { manifest_hash.merge!('jobs' => []) }
+          before { manifest_hash.merge!(keyword => []) }
 
           let(:event_log) { instance_double('Bosh::Director::EventLog::Log') }
 
           context 'when job names are unique' do
             before do
-              manifest_hash.merge!('jobs' => [
-                { 'name' => 'job1-name' },
-                { 'name' => 'job2-name' },
+              manifest_hash.merge!(keyword => [
+                { 'name' => 'instance-group-1-name' },
+                { 'name' => 'instance-group-2-name' },
               ])
             end
 
-            let(:job1) do
-              instance_double('Bosh::Director::DeploymentPlan::Job', {
-                name: 'job1-name',
-                canonical_name: 'job1-canonical-name',
+            let(:instance_group_1) do
+              instance_double('Bosh::Director::DeploymentPlan::InstanceGroup', {
+                name: 'instance-group-1-name',
+                canonical_name: 'instance-group-1-canonical-name',
+                jobs: []
               })
             end
 
-            let(:job2) do
-              instance_double('Bosh::Director::DeploymentPlan::Job', {
-                name: 'job2-name',
-                canonical_name: 'job2-canonical-name',
+            let(:instance_group_2) do
+              instance_double('Bosh::Director::DeploymentPlan::InstanceGroup', {
+                name: 'instance-group-2-name',
+                canonical_name: 'instance-group-2-canonical-name',
+                jobs: []
               })
             end
 
             it 'delegates to Job to parse job specs' do
-              expect(DeploymentPlan::Job).to receive(:parse).
-                with(be_a(DeploymentPlan::Planner), {'name' => 'job1-name'}, event_log, logger).
-                and_return(job1)
+              expect(DeploymentPlan::InstanceGroup).to receive(:parse).
+                with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-1-name'}, event_log, logger, {}).
+                and_return(instance_group_1)
 
-              expect(DeploymentPlan::Job).to receive(:parse).
-                with(be_a(DeploymentPlan::Planner), {'name' => 'job2-name'}, event_log, logger).
-                and_return(job2)
+              expect(DeploymentPlan::InstanceGroup).to receive(:parse).
+                with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-2-name'}, event_log, logger, {}).
+                and_return(instance_group_2)
 
-              expect(parsed_deployment.jobs).to eq([job1, job2])
+              expect(parsed_deployment.instance_groups).to eq([instance_group_1, instance_group_2])
+            end
+
+            context 'when canaries value is present in options' do
+              let(:options) { { 'canaries'=> '42' } }
+              it "replaces canaries value from job's update section with option's value" do
+                expect(DeploymentPlan::InstanceGroup).to receive(:parse)
+                  .with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-1-name'}, event_log, logger, options)
+                  .and_return(instance_group_1)
+
+                expect(DeploymentPlan::InstanceGroup).to receive(:parse).
+                  with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-2-name'}, event_log, logger, options).
+                  and_return(instance_group_2)
+
+                parsed_deployment.instance_groups
+              end
+            end
+
+            context 'when max_in_flight value is present in options' do
+              let(:options) { { 'max_in_flight'=> '42' } }
+              it "replaces max_in_flight value from job's update section with option's value" do
+                expect(DeploymentPlan::InstanceGroup).to receive(:parse)
+                   .with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-1-name'}, event_log, logger, options)
+                   .and_return(instance_group_1)
+
+                expect(DeploymentPlan::InstanceGroup).to receive(:parse).
+                  with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-2-name'}, event_log, logger, options).
+                  and_return(instance_group_2)
+
+                parsed_deployment.instance_groups
+              end
             end
 
             it 'allows to look up job by name' do
-              allow(DeploymentPlan::Job).to receive(:parse).
-                with(be_a(DeploymentPlan::Planner), {'name' => 'job1-name'}, event_log, logger).
-                and_return(job1)
+              allow(DeploymentPlan::InstanceGroup).to receive(:parse).
+                with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-1-name'}, event_log, logger, {}).
+                and_return(instance_group_1)
 
-              allow(DeploymentPlan::Job).to receive(:parse).
-                with(be_a(DeploymentPlan::Planner), {'name' => 'job2-name'}, event_log, logger).
-                and_return(job2)
+              allow(DeploymentPlan::InstanceGroup).to receive(:parse).
+                with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-2-name'}, event_log, logger, {}).
+                and_return(instance_group_2)
 
-              expect(parsed_deployment.job('job1-name')).to eq(job1)
-              expect(parsed_deployment.job('job2-name')).to eq(job2)
+
+              expect(parsed_deployment.instance_group('instance-group-1-name')).to eq(instance_group_1)
+              expect(parsed_deployment.instance_group('instance-group-2-name')).to eq(instance_group_2)
             end
           end
 
-          context 'when more than one job have same canonical name' do
+          context 'when more than one instance group have the same canonical name' do
             before do
-              manifest_hash.merge!('jobs' => [
-                { 'name' => 'job1-name' },
-                { 'name' => 'job2-name' },
+              manifest_hash.merge!(keyword => [
+                { 'name' => 'instance-group-1-name' },
+                { 'name' => 'instance-group-2-name' },
               ])
             end
 
-            let(:job1) do
-              instance_double('Bosh::Director::DeploymentPlan::Job', {
-                name: 'job1-name',
+            let(:instance_group_1) do
+              instance_double('Bosh::Director::DeploymentPlan::InstanceGroup', {
+                name: 'instance-group-1-name',
                 canonical_name: 'same-canonical-name',
               })
             end
 
-            let(:job2) do
-              instance_double('Bosh::Director::DeploymentPlan::Job', {
-                name: 'job2-name',
+            let(:instance_group_2) do
+              instance_double('Bosh::Director::DeploymentPlan::InstanceGroup', {
+                name: 'instance-group-2-name',
                 canonical_name: 'same-canonical-name',
               })
             end
 
             it 'raises an error' do
-              allow(DeploymentPlan::Job).to receive(:parse).
-                with(be_a(DeploymentPlan::Planner), {'name' => 'job1-name'}, event_log, logger).
-                and_return(job1)
+              allow(DeploymentPlan::InstanceGroup).to receive(:parse).
+                with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-1-name'}, event_log, logger, {}).
+                and_return(instance_group_1)
 
-              allow(DeploymentPlan::Job).to receive(:parse).
-                with(be_a(DeploymentPlan::Planner), {'name' => 'job2-name'}, event_log, logger).
-                and_return(job2)
+              allow(DeploymentPlan::InstanceGroup).to receive(:parse).
+                with(be_a(DeploymentPlan::Planner), {'name' => 'instance-group-2-name'}, event_log, logger, {}).
+                and_return(instance_group_2)
 
               expect {
                 parsed_deployment
               }.to raise_error(
                 DeploymentCanonicalJobNameTaken,
-                "Invalid job name `job2-name', canonical name already taken",
+                "Invalid instance group name 'instance-group-2-name', canonical name already taken",
               )
             end
           end
         end
 
         context 'when there are no jobs' do
-          before { manifest_hash.merge!('jobs' => []) }
+          before { manifest_hash.merge!(keyword => []) }
 
           it 'parses jobs and return empty array' do
-            expect(parsed_deployment.jobs).to eq([])
+            expect(parsed_deployment.instance_groups).to eq([])
           end
         end
 
         context 'when jobs key is not specified' do
-          before { manifest_hash.delete('jobs') }
+          before { manifest_hash.delete(keyword) }
 
           it 'parses jobs and return empty array' do
-            expect(parsed_deployment.jobs).to eq([])
+            expect(parsed_deployment.instance_groups).to eq([])
           end
         end
       end
 
-      describe 'job_rename option' do
-        context 'when old_name from job_rename option is referencing a job in jobs section' do
-          before { manifest_hash.merge!('jobs' => [{'name' => 'job-old-name'}]) }
+      describe 'jobs key' do
+        let(:keyword) { "jobs" }
+        it_behaves_like "jobs/instance_groups key"
+      end
 
-          let(:job) do
-            instance_double('Bosh::Director::DeploymentPlan::Job', {
-              name: 'job-old-name',
-              canonical_name: 'job-canonical-name',
-            })
+      describe 'instance_group key' do
+        let(:keyword) { "instance_groups" }
+        it_behaves_like "jobs/instance_groups key"
+
+        context 'when there are both jobs and instance_groups' do
+          before do
+            manifest_hash.merge!('jobs' => [
+                                     { 'name' => 'instance-group-1-name' },
+                                     { 'name' => 'instance-group-2-name' },
+                                 ],
+                                 'instance_groups' => [
+                                     { 'name' => 'instance-group-1-name' },
+                                     { 'name' => 'instance-group-2-name' },
+                                 ])
           end
 
-          let(:planner_options) do
-            {
-              'job_rename' => {
-                'old_name' => 'job-old-name',
-                'new_name' => 'job-new-name',
-              }
-            }
-          end
-
-          it 'raises an error because only new_name should reference a job' do
-            allow(DeploymentPlan::Job).to receive(:parse).
-              with(be_a(DeploymentPlan::Planner), {'name' => 'job-old-name'}, event_log, logger).
-              and_return(job)
-
-            expect {
-              parsed_deployment
-            }.to raise_error(
-              DeploymentRenamedJobNameStillUsed,
-              "Renamed job `job-old-name' is still referenced in deployment manifest",
-            )
+          it 'throws an error' do
+            expect {parsed_deployment}.to raise_error(JobBothInstanceGroupAndJob, "Deployment specifies both jobs and instance_groups keys, only one is allowed")
           end
         end
       end

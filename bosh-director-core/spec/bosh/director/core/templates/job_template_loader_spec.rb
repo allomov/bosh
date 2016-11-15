@@ -7,6 +7,9 @@ require 'stringio'
 require 'yaml'
 require 'zlib'
 
+# prevent using ASCII on ppc64le platform
+Encoding.default_external = "UTF-8"
+
 def gzip(string)
   result = StringIO.new
   zio = Zlib::GzipWriter.new(result, nil, nil)
@@ -72,7 +75,7 @@ module Bosh::Director::Core::Templates
 
         tmp_file = Tempfile.new('blob')
         File.open(tmp_file.path, 'w') { |f| f.write(template_contents) }
-        job_template = double('Bosh::Director::DeploymentPlan::Template', download_blob: tmp_file.path, name: 'foo')
+        job_template = double('Bosh::Director::DeploymentPlan::Job', download_blob: tmp_file.path, name: 'foo')
 
         container = job_template_loader.process(job_template)
 
@@ -91,7 +94,7 @@ module Bosh::Director::Core::Templates
 
         tmp_file = Tempfile.new('blob')
         File.open(tmp_file.path, 'w') { |f| f.write(template_contents) }
-        job_template = double('Bosh::Director::DeploymentPlan::Template', download_blob: tmp_file.path, name: 'foo')
+        job_template = double('Bosh::Director::DeploymentPlan::Job', download_blob: tmp_file.path, name: 'foo')
 
         container = job_template_loader.process(job_template)
 

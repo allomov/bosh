@@ -1,4 +1,5 @@
 require 'securerandom'
+require 'common/version/stemcell_version_list'
 
 module Bosh::Director
   module Api
@@ -9,9 +10,57 @@ module Bosh::Director
         stemcell = Models::Stemcell[:name => name, :version => version]
         if stemcell.nil?
           raise StemcellNotFound,
-                "Stemcell `#{name}/#{version}' doesn't exist"
+                "Stemcell '#{name}/#{version}' doesn't exist"
         end
         stemcell
+      end
+
+      def find_all_stemcells
+        Models::Stemcell.order_by(Sequel.asc(:name)).map do |stemcell|
+          {
+            'name' => stemcell.name,
+            'operating_system' => stemcell.operating_system,
+            'version' => stemcell.version,
+            'cid' => stemcell.cid,
+            'deployments' => stemcell.deployments.map { |d| { name: d.name } }
+          }
+        end
+      end
+
+      def latest_by_os(os, prefix = nil)
+        stemcells = Bosh::Director::Models::Stemcell.where(:operating_system => os).all
+
+        if stemcells.empty?
+          raise StemcellNotFound,
+            "Stemcell with Operating System '#{os}' doesn't exist"
+        end
+
+        latest = find_latest(stemcells, prefix)
+
+        if latest.nil?
+          raise StemcellNotFound,
+            "Stemcell with Operating System '#{os}' exists, but version with prefix '#{prefix}' not found."
+        end
+
+        latest
+      end
+
+      def latest_by_name(name, prefix = nil)
+        stemcells = Bosh::Director::Models::Stemcell.where(:name => name).all
+
+        if stemcells.empty?
+          raise StemcellNotFound,
+            "Stemcell '#{name}' doesn't exist"
+        end
+
+        latest = find_latest(stemcells, prefix)
+
+        if latest.nil?
+          raise StemcellNotFound,
+            "Stemcell '#{name}' exists, but version with prefix '#{prefix}' not found."
+        end
+
+        latest
       end
 
       def find_by_os_and_version(os, version)
@@ -19,7 +68,7 @@ module Bosh::Director
             dataset.order(:name)[:operating_system => os, :version => version]
         if stemcell.nil?
           raise StemcellNotFound,
-                "Stemcell version `#{version}' for OS `#{os}' doesn't exist"
+                "Stemcell version '#{version}' for OS '#{os}' doesn't exist"
         end
         stemcell
       end
@@ -48,6 +97,27 @@ module Bosh::Director
         description = "delete stemcell: #{stemcell.name}/#{stemcell.version}"
 
         JobQueue.new.enqueue(username, Jobs::DeleteStemcell, description, [stemcell.name, stemcell.version, options])
+      end
+
+      private
+
+      def find_latest(stemcells, prefix = nil)
+        unless prefix.nil?
+          stemcells = stemcells.select do |stemcell|
+            stemcell.version =~ /^#{prefix}([\.\-\+]|$)/
+          end
+        end
+
+        versions = stemcells.map(&:version)
+
+        latest_version = Bosh::Common::Version::StemcellVersionList.parse(versions).latest.to_s
+
+        latest_stemcell = stemcells.find do |stemcell|
+          parsed_version = Bosh::Common::Version::StemcellVersion.parse(stemcell.version).to_s
+          parsed_version == latest_version
+        end
+
+        latest_stemcell
       end
     end
   end

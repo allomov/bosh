@@ -41,12 +41,34 @@ describe Bhm::Agent do
     agent = make_agent("zb")
     agent.cid = "deadbeef"
     expect(agent.name).to eq("agent zb [cid=deadbeef]")
+    agent.instance_id = "iuuid"
+    expect(agent.name).to eq("agent zb [instance_id=iuuid, cid=deadbeef]")
     agent.deployment = "oleg-cloud"
-    expect(agent.name).to eq("agent zb [deployment=oleg-cloud, cid=deadbeef]")
+    expect(agent.name).to eq("agent zb [deployment=oleg-cloud, instance_id=iuuid, cid=deadbeef]")
     agent.job = "mysql_node"
-    expect(agent.name).to eq("agent zb [deployment=oleg-cloud, job=mysql_node, cid=deadbeef]")
+    expect(agent.name).to eq("oleg-cloud: mysql_node(iuuid) [id=zb, cid=deadbeef]")
     agent.index = "0"
-    expect(agent.name).to eq("oleg-cloud: mysql_node(0) [id=zb, cid=deadbeef]")
+    expect(agent.name).to eq("oleg-cloud: mysql_node(iuuid) [id=zb, index=0, cid=deadbeef]")
   end
 
+  describe '#update_instance' do
+
+    context 'when given an instance' do
+
+      let(:instance) {
+        double('instance', job: 'job', index: 1, cid: 'cid', id: 'id')
+      }
+
+      it 'populates the corresponding attributes' do
+        agent = make_agent('agent_with_instance')
+
+        agent.update_instance(instance)
+
+        expect(agent.job).to eq(instance.job)
+        expect(agent.index).to eq(instance.index)
+        expect(agent.cid).to eq(instance.cid)
+        expect(agent.instance_id).to eq(instance.id)
+      end
+    end
+  end
 end

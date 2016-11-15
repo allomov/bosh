@@ -20,7 +20,7 @@ describe Bosh::Cli::Command::Base do
 
   before { stub_request(:get, "#{target}/info").to_return(body: '{}') }
 
-  let(:target) { 'https://127.0.0.1:8080' }
+  let(:target) { 'https://localhost:8080' }
 
   it 'can access configuration and respects options' do
     add_config('target' => 'localhost:8080', 'target_name' => 'microbosh', 'deployment' => 'test')
@@ -124,9 +124,9 @@ describe Bosh::Cli::Command::Base do
       before do
         director_status = {'user_authentication' => {
           'type' => 'uaa',
-          'options' => {'url' => 'https://127.0.0.1:8080/uaa'}
+          'options' => {'url' => 'https://localhost:8080/uaa'}
         }}
-        stub_request(:get, 'https://127.0.0.1:8080/info').to_return(body: JSON.dump(director_status))
+        stub_request(:get, 'https://localhost:8080/info').to_return(body: JSON.dump(director_status))
       end
 
       context 'when client credentials are provided in environment' do
@@ -320,4 +320,28 @@ describe Bosh::Cli::Command::Base do
       end
     end
   end
+
+  describe 'ca_cert' do
+    context 'when ca cert is provided as part of the command with the --ca-cert flag' do
+      it 'should override ca cert from global config' do
+        add_config('target' => 'localhost:8080', 'ca_cert' => {'https://localhost:8080' => 'tmp/config_ca_cert'})
+        cmd = make
+        cmd.add_option(:ca_cert, 'tmp/command_ca_cert')
+
+        expect(Bosh::Cli::Client::Director).to receive(:new).with('https://localhost:8080', nil, ca_cert: 'tmp/command_ca_cert')
+        cmd.send(:auth_info)
+      end
+    end
+
+    context 'when ca cert is NOT provided as part of the command with the --ca-cert flag' do
+      it 'should use ca cert from global config' do
+        add_config('target' => 'localhost:8080', 'ca_cert' => {'https://localhost:8080' => 'tmp/config_ca_cert'})
+        cmd = make
+
+        expect(Bosh::Cli::Client::Director).to receive(:new).with('https://localhost:8080', nil, ca_cert: 'tmp/config_ca_cert')
+        cmd.send(:auth_info)
+      end
+    end
+  end
+
 end

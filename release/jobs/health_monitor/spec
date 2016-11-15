@@ -40,10 +40,17 @@ properties:
   hm.intervals.rogue_agent_alert:
     description: Interval (in seconds) to consider an agent as rogue (an agent that is no part of any deployment)
     default: 120
+  hm.intervals.analyze_instances:
+    description: Interval (in seconds) to analyze the status of instances for missing VMs
+    default: 60
 
   hm.loglevel:
     description: Level of log messages (fatal, error, warn, info, debug)
     default: info
+
+  hm.em_threadpool_size:
+    description: EM thread pool size
+    default: 20
 
   #
   # NATS options (to get alerts from agents)
@@ -106,13 +113,13 @@ properties:
   hm.email_recipients:
     description: Email of recipients (Array)
   hm.smtp.from:
-    description: Email of sender
+    description: Email of sender, e.g. "bosh-director@cfapps.io"
   hm.smtp.host:
-    description: Address of the SMTP server to connect to
+    description: Address of the SMTP server to connect to (e.g. "smtp.gmail.com")
   hm.smtp.port:
-    description: Port of the SMTP server to connect to
+    description: Port of the SMTP server to connect to (e.g. 25, 465, or 587)
   hm.smtp.domain:
-    description: SMTP EHLO domain
+    description: SMTP EHLO domain (typically server's fully qualified domain name, e.g. "bosh.cfapps.io")
   hm.smtp.tls:
     description: Use STARTTLS (optional)
   hm.smtp.auth:
@@ -141,6 +148,16 @@ properties:
     description: PagerDuty service API key
   hm.pagerduty.http_proxy:
     description: HTTP proxy to connect to PagerDuty (optional)
+
+  # Send events via Riemann
+  hm.riemann_enabled:
+    description: Enable Riemann plugin
+    default: false
+  hm.riemann.host:
+    description: Riemann host
+  hm.riemann.port:
+    description: Riemann port
+    default: 5555
 
   # Send metrics to AWS CloudWatch
   hm.cloud_watch_enabled:
@@ -227,3 +244,13 @@ properties:
   hm.syslog_event_forwarder.transport:
     description: One of ["udp", "tcp", "relp"]
     default: tcp
+  hm.syslog_event_forwarder.custom_rule:
+    description: Custom rule for syslog event forwarder
+    default: ""
+
+  env.http_proxy:
+    description: HTTP proxy that the health monitor should use
+  env.https_proxy:
+    description: HTTPS proxy that the health monitor should use
+  env.no_proxy:
+    description: List of comma-separated hosts that should skip connecting to the proxy in the health monitor

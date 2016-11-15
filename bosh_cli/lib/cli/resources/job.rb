@@ -4,10 +4,9 @@ module Bosh::Cli::Resources
 
     # @param [String] directory base Release directory
     def self.discover(release_base, packages)
-      Dir[File.join(release_base, 'jobs', '*')].inject([]) do |jobs, job_base|
-        next unless File.directory?(job_base)
-        jobs << new(job_base, release_base, packages)
-      end
+      jobs_folder_contents = Dir[File.join(release_base, 'jobs', '*')]
+      job_folders = jobs_folder_contents.select { |f| File.directory?(f) }
+      job_folders.map { |job_base| new(job_base, release_base, packages) }
     end
 
     attr_reader :job_base, :release_base, :package_dependencies
@@ -20,8 +19,8 @@ module Bosh::Cli::Resources
 
     def spec
       @spec ||= load_yaml_file(job_base.join('spec'))
-    rescue
-      raise Bosh::Cli::InvalidJob, 'Job spec is missing'
+    rescue Exception => e
+      raise Bosh::Cli::InvalidJob, "Job spec is missing or invalid: #{e.message}"
     end
 
     def name
@@ -60,7 +59,7 @@ module Bosh::Cli::Resources
         raise Bosh::Cli::InvalidJob, "'#{name}' is not a valid BOSH identifier"
       end
 
-      unless spec['templates'].is_a?(Hash)
+      unless  spec['templates'].nil? or spec['templates'].is_a?(Hash)
         raise Bosh::Cli::InvalidJob, "Incorrect templates section in '#{name}' job spec (Hash expected, #{spec['templates'].class} given)"
       end
 
@@ -139,7 +138,7 @@ module Bosh::Cli::Resources
     end
 
     def templates
-      spec['templates'].keys
+      spec['templates'] ? spec['templates'].keys : []
     end
 
     def templates_dir

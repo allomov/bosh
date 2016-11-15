@@ -1,10 +1,9 @@
 require 'spec_helper'
 
 describe 'Ubuntu 14.04 stemcell image', stemcell_image: true do
-
   it_behaves_like 'All Stemcells'
 
-  context 'installed by image_install_grub', exclude_on_warden: true do
+  context 'installed by image_install_grub', {exclude_on_ppc64le: true} do
     describe file('/boot/grub/grub.conf') do
       it { should be_file }
       it { should contain 'default=0' }
@@ -15,12 +14,14 @@ describe 'Ubuntu 14.04 stemcell image', stemcell_image: true do
       it { should contain ' selinux=0' }
       it { should contain ' cgroup_enable=memory swapaccount=1' }
       it { should contain ' console=tty0 console=ttyS0,115200n8' }
+      it { should contain ' earlyprintk=ttyS0 rootdelay=300' }
       its(:content) { should match %r{initrd /boot/initrd.img-\S+-generic} }
 
       it('should set the grub menu password (stig: V-38585)') { should contain /^password --md5 $1$.*/ }
       it('should be of mode 600 (stig: V-38583)') { should be_mode('600') }
       it('should be owned by root (stig: V-38579)') { should be_owned_by('root') }
       it('should be grouped into root (stig: V-38581)') { should be_grouped_into('root') }
+      it('audits processes that start prior to auditd (CIS-8.1.3)') { should contain ' audit=1' }
     end
 
     describe file('/boot/grub/menu.lst') do
@@ -29,9 +30,34 @@ describe 'Ubuntu 14.04 stemcell image', stemcell_image: true do
     end
   end
 
+  context 'installs recent version of unshare so it gets the -p flag', {
+    exclude_on_aws: true,
+    exclude_on_azure: true,
+    exclude_on_google: true,
+    exclude_on_vcloud: true,
+    exclude_on_vsphere: true,
+    exclude_on_openstack: true,
+    exclude_on_softlayer: true,
+  } do
+    context 'so we can run upstart in as PID 1 in the container' do
+      describe file('/var/vcap/bosh/bin/unshare') do
+        it { should be_file }
+        it { should be_executable }
+        it { should be_owned_by('root') }
+        it { should be_grouped_into('root') }
+      end
+    end
+  end
+
   context 'installed by system_parameters' do
     describe file('/var/vcap/bosh/etc/operating_system') do
       it { should contain('ubuntu') }
+    end
+  end
+
+  context 'installed by dev_tools_config' do
+    describe file('/var/vcap/bosh/etc/dev_tools_file_list') do
+      it { should contain('/usr/bin/gcc') }
     end
   end
 
@@ -43,10 +69,21 @@ describe 'Ubuntu 14.04 stemcell image', stemcell_image: true do
     end
   end
 
-  context 'installed by system-aws-network', {
+  context 'installed by system-network', {
+    exclude_on_warden: true
+  } do
+    describe file('/etc/hostname') do
+      it { should be_file }
+      its (:content) { should eq('bosh-stemcell') }
+    end
+  end
+
+  context 'installed by system-network on some IaaSes', {
     exclude_on_vsphere: true,
     exclude_on_vcloud: true,
     exclude_on_warden: true,
+    exclude_on_azure: true,
+    exclude_on_softlayer: true,
   } do
     describe file('/etc/network/interfaces') do
       it { should be_file }
@@ -55,22 +92,72 @@ describe 'Ubuntu 14.04 stemcell image', stemcell_image: true do
     end
   end
 
+  context 'installed by system-azure-network', {
+    exclude_on_aws: true,
+    exclude_on_google: true,
+    exclude_on_vcloud: true,
+    exclude_on_vsphere: true,
+    exclude_on_warden: true,
+    exclude_on_openstack: true,
+    exclude_on_softlayer: true,
+  } do
+    describe file('/etc/network/interfaces') do
+      it { should be_file }
+      it { should contain 'auto eth0' }
+      it { should contain 'iface eth0 inet dhcp' }
+    end
+  end
+
   context 'installed by system_open_vm_tools', {
     exclude_on_aws: true,
+    exclude_on_google: true,
     exclude_on_vcloud: true,
     exclude_on_warden: true,
     exclude_on_openstack: true,
+    exclude_on_azure: true,
+    exclude_on_softlayer: true,
   } do
     describe package('open-vm-tools') do
       it { should be_installed }
     end
   end
 
+  context 'installed by system_softlayer_open_iscsi', {
+      exclude_on_aws: true,
+      exclude_on_google: true,
+      exclude_on_vsphere: true,
+      exclude_on_vcloud: true,
+      exclude_on_warden: true,
+      exclude_on_openstack: true,
+      exclude_on_azure: true,
+  } do
+    describe package('open-iscsi') do
+      it { should be_installed }
+    end
+  end
+
+  context 'installed by system_softlayer_multipath_tools', {
+      exclude_on_aws: true,
+      exclude_on_google: true,
+      exclude_on_vsphere: true,
+      exclude_on_vcloud: true,
+      exclude_on_warden: true,
+      exclude_on_openstack: true,
+      exclude_on_azure: true,
+  } do
+    describe package('multipath-tools') do
+      it { should be_installed }
+    end
+  end
+
   context 'installed by image_vsphere_cdrom stage', {
     exclude_on_aws: true,
+    exclude_on_google: true,
     exclude_on_vcloud: true,
     exclude_on_warden: true,
     exclude_on_openstack: true,
+    exclude_on_azure: true,
+    exclude_on_softlayer: true,
   } do
     describe file('/etc/udev/rules.d/60-cdrom_id.rules') do
       it { should be_file }
@@ -101,10 +188,13 @@ HERE
   end
 
   context 'installed by bosh_aws_agent_settings', {
+    exclude_on_google: true,
     exclude_on_openstack: true,
     exclude_on_vcloud: true,
     exclude_on_vsphere: true,
     exclude_on_warden: true,
+    exclude_on_azure: true,
+    exclude_on_softlayer: true,
   } do
     describe file('/var/vcap/bosh/agent.json') do
       it { should be_valid_json_file }
@@ -112,11 +202,29 @@ HERE
     end
   end
 
-  context 'installed by bosh_openstack_agent_settings', {
+  context 'installed by bosh_google_agent_settings', {
     exclude_on_aws: true,
+    exclude_on_openstack: true,
     exclude_on_vcloud: true,
     exclude_on_vsphere: true,
     exclude_on_warden: true,
+    exclude_on_azure: true,
+    exclude_on_softlayer: true,
+  } do
+    describe file('/var/vcap/bosh/agent.json') do
+      it { should be_valid_json_file }
+      it { should contain('"Type": "InstanceMetadata"') }
+    end
+  end
+
+  context 'installed by bosh_openstack_agent_settings', {
+    exclude_on_aws: true,
+    exclude_on_google: true,
+    exclude_on_vcloud: true,
+    exclude_on_vsphere: true,
+    exclude_on_warden: true,
+    exclude_on_azure: true,
+    exclude_on_softlayer: true,
   } do
     describe file('/var/vcap/bosh/agent.json') do
       it { should be_valid_json_file }
@@ -128,9 +236,12 @@ HERE
 
   context 'installed by bosh_vsphere_agent_settings', {
     exclude_on_aws: true,
+    exclude_on_google: true,
     exclude_on_vcloud: true,
     exclude_on_openstack: true,
     exclude_on_warden: true,
+    exclude_on_azure: true,
+    exclude_on_softlayer: true,
   } do
     describe file('/var/vcap/bosh/agent.json') do
       it { should be_valid_json_file }
@@ -138,9 +249,27 @@ HERE
     end
   end
 
-  context 'default packages removed' do
-    describe package('postfix') do
-      it { should_not be_installed }
+  context 'installed by bosh_softlayer_agent_settings', {
+      exclude_on_aws: true,
+      exclude_on_google: true,
+      exclude_on_vcloud: true,
+      exclude_on_vsphere: true,
+      exclude_on_warden: true,
+      exclude_on_azure: true,
+      exclude_on_openstack: true,
+  } do
+    describe file('/var/vcap/bosh/agent.json') do
+      it { should be_valid_json_file }
+      it { should contain('"Type": "File"') }
+      it { should contain('"SettingsPath": "/var/vcap/bosh/user_data.json"') }
+      it { should contain('"UseRegistry": true') }
+    end
+  end
+
+  describe 'mounted file systems: /etc/fstab should mount nfs with nodev (stig: V-38654) (stig: V-38652)' do
+    describe file('/etc/fstab') do
+      it { should be_file }
+      its (:content) { should eq("# UNCONFIGURED FSTAB FOR BASE SYSTEM\n") }
     end
   end
 end
@@ -151,6 +280,12 @@ describe 'Ubuntu 14.04 stemcell tarball', stemcell_tarball: true do
       it { should be_file }
       it { should contain 'Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend' }
       it { should contain 'ubuntu-minimal' }
+    end
+  end
+
+  context 'installed by dev_tools_config stage' do
+    describe file("#{ENV['STEMCELL_WORKDIR']}/stemcell/dev_tools_file_list.txt") do
+      it { should be_file }
     end
   end
 end

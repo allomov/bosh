@@ -7,7 +7,7 @@ module Bosh
 end
 
 require "aws-sdk"
-require "fog"
+require "fog/openstack"
 require "logger"
 require "sequel"
 require "sinatra/base"
@@ -20,6 +20,7 @@ require "bosh/registry/api_controller"
 require "bosh/registry/config"
 require "bosh/registry/errors"
 require "bosh/registry/instance_manager"
+require "bosh/registry/instance_manager/aws_credentials_provider"
 require "bosh/registry/runner"
 require "bosh/registry/version"
 

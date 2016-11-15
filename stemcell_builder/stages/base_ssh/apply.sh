@@ -7,6 +7,9 @@ source $base_dir/lib/prelude_apply.bash
 
 chmod 0600 $chroot/etc/ssh/sshd_config
 
+# protect against as-shipped sshd_config that has no newline at end
+echo "" >> $chroot/etc/ssh/sshd_config
+
 sed "/^ *UseDNS/d" -i $chroot/etc/ssh/sshd_config
 echo 'UseDNS no' >> $chroot/etc/ssh/sshd_config
 
@@ -30,7 +33,7 @@ sed "/^ *HostbasedAuthentication/d" -i $chroot/etc/ssh/sshd_config
 echo 'HostbasedAuthentication no' >> $chroot/etc/ssh/sshd_config
 
 sed "/^ *Banner/d" -i $chroot/etc/ssh/sshd_config
-echo 'Banner /etc/issue' >> $chroot/etc/ssh/sshd_config
+echo 'Banner /etc/issue.net' >> $chroot/etc/ssh/sshd_config
 
 sed "/^ *IgnoreRhosts/d" -i $chroot/etc/ssh/sshd_config
 echo 'IgnoreRhosts yes' >> $chroot/etc/ssh/sshd_config
@@ -44,11 +47,14 @@ echo 'PermitUserEnvironment no' >> $chroot/etc/ssh/sshd_config
 sed "/^ *ClientAliveCountMax/d" -i $chroot/etc/ssh/sshd_config
 echo 'ClientAliveCountMax 0' >> $chroot/etc/ssh/sshd_config
 
-# protect against as-shipped sshd_config that has no newline at end
-echo "" >> $chroot/etc/ssh/sshd_config
+sed "/^ *PasswordAuthentication/d" -i $chroot/etc/ssh/sshd_config
+echo 'PasswordAuthentication no' >> $chroot/etc/ssh/sshd_config
+
+sed "/^ *PrintLastLog/d" -i $chroot/etc/ssh/sshd_config
+echo 'PrintLastLog yes' >> $chroot/etc/ssh/sshd_config
 
 # OS Specifics
-if [ "$(get_os_type)" == "centos" -o "$(get_os_type)" == "rhel" -o "$(get_os_type)" == "photon" ]; then
+if [ "$(get_os_type)" == "centos" -o "$(get_os_type)" == "rhel" -o "$(get_os_type)" == "photonos" ]; then
   # Allow only 3DES and AES series ciphers
   sed "/^ *Ciphers/d" -i $chroot/etc/ssh/sshd_config
   echo 'Ciphers aes256-ctr,aes192-ctr,aes128-ctr' >> $chroot/etc/ssh/sshd_config
@@ -71,3 +77,17 @@ else
   exit 1
 
 fi
+
+cat << EOF > $chroot/etc/issue
+Unauthorized use is strictly prohibited. All access and activity
+is subject to logging and monitoring.
+EOF
+
+cp $chroot/etc/issue{,.net}
+
+touch $chroot/etc/motd
+
+for file in $chroot/etc/{issue,issue.net,motd}; do
+    chown root:root $file
+    chmod 644 $file
+done

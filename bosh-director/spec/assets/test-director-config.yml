@@ -5,11 +5,6 @@ port: 8081
 logging:
   level: ERROR
 
-redis:
-  host: 127.0.0.1
-  port: 63790
-  password:
-
 dir: /tmp/boshdir
 db:
   adapter: sqlite
@@ -23,6 +18,9 @@ blobstore:
     endpoint: http://127.0.0.1
     user: admin
     password:
+local_dns:
+  enabled: false
+  include_index: false
 compiled_package_cache:
   provider: local
   options:
@@ -47,3 +45,6 @@ user_management:
   local:
     users:
     - {name: admin, password: admin}
+config_server:
+  enabled: false
+record_events: true

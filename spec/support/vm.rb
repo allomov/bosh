@@ -1,22 +1,34 @@
 module Bosh::Spec
   class Vm
-    attr_reader :job_name_index, :last_known_state, :cid, :agent_id
+    attr_reader :last_known_state, :cid, :agent_id, :resurrection, :ips, :availability_zone, :instance_uuid, :job_name, :index, :ignore
 
     def initialize(
       waiter,
-      job_name_index,
       job_state,
       cid,
       agent_id,
+      resurrection,
+      ips,
+      availability_zone,
+      instance_uuid,
+      job_name,
+      index,
+      ignore,
       agent_base_dir,
       nats_port,
       logger
     )
       @waiter = waiter
-      @job_name_index = job_name_index
       @last_known_state = job_state
       @cid = cid
       @agent_id = agent_id
+      @resurrection = resurrection
+      @ips = ips
+      @availability_zone = availability_zone
+      @instance_uuid = instance_uuid
+      @job_name = job_name
+      @index = index
+      @ignore = ignore
       @agent_base_dir = agent_base_dir
       @nats_port = nats_port
       @logger = logger
@@ -71,8 +83,8 @@ module Bosh::Spec
     end
 
     def unblock_package
+      package_dir = package_path('blocking_package')
       @waiter.wait(300) do
-        package_dir = package_path('blocking_package')
         raise('Must find package dir') unless File.exists?(package_dir)
         FileUtils.touch(File.join(package_dir, 'unblock_packaging'))
       end
@@ -86,8 +98,10 @@ module Bosh::Spec
       job_dir_path = job_path(job_name)
       @logger.debug("Unblocking package at #{job_dir_path}")
 
-      raise('Failed to get errand dir') unless File.exists?(job_dir_path)
-      FileUtils.touch(File.join(job_dir_path, 'unblock_errand'))
+      @waiter.wait(15) do
+        raise('Must find errand dir') unless File.exists?(job_dir_path)
+        FileUtils.touch(File.join(job_dir_path, 'unblock_errand'))
+      end
     end
 
     def job_path(job_name)
@@ -102,6 +116,10 @@ module Bosh::Spec
     def get_state
       spec_path = File.join(@agent_base_dir, 'bosh', 'spec.json')
       Yajl::Parser.parse(File.read(spec_path))
+    end
+
+    def read_etc_hosts
+      read_file(File.join('bosh', 'etc_hosts'))
     end
 
     private

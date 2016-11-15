@@ -1,7 +1,10 @@
 require 'ostruct'
 require 'bosh/template/evaluation_failed'
 require 'bosh/template/unknown_property'
+require 'bosh/template/unknown_link'
 require 'bosh/template/property_helper'
+require 'bosh/template/evaluation_link_instance'
+require 'bosh/template/evaluation_link'
 
 module Bosh
   module Template
@@ -39,9 +42,11 @@ module Bosh
         end
 
         @index = spec['index']
-        @spec = openstruct(spec)
+        @spec = openstruct(spec, BackCompatOpenStruct)
         @raw_properties = spec['properties'] || {}
         @properties = openstruct(@raw_properties)
+
+        @links = spec['links'] || {}
       end
 
       # @return [Binding] Template binding
@@ -88,6 +93,19 @@ module Bosh
         raise UnknownProperty.new(names)
       end
 
+      def link(name)
+        result = lookup_property(@links, name)
+        raise UnknownLink.new(name) if result.nil?
+
+        if result.has_key?("instances")
+          instance_array = result["instances"].map do |link_spec|
+            EvaluationLinkInstance.new(link_spec["name"], link_spec["index"], link_spec["id"], link_spec["az"], link_spec["address"], link_spec["properties"], link_spec["bootstrap"])
+          end
+          return EvaluationLink.new(instance_array, result["properties"])
+        end
+        raise UnknownLink.new(name)
+      end
+
       # Run a block of code if all given properties are defined
       # @param [Array<String>] names Property names
       # @yield [Object] property values
@@ -102,18 +120,49 @@ module Bosh
         InactiveElseBlock.new
       end
 
+      # Run a block of code if the link given exists
+      # @param [String] name of the link
+      # @yield [Object] link, which is an array of instances
+      def if_link(name)
+        link_found = lookup_property(@links, name)
+        if link_found.nil? || !link_found.has_key?("instances")
+          return ActiveElseBlock.new(self)
+        else
+          instance_array = link_found["instances"].map do |link_spec|
+            EvaluationLinkInstance.new(link_spec["name"], link_spec["index"], link_spec["id"], link_spec["az"], link_spec["address"], link_spec["properties"], link_spec["bootstrap"])
+          end
+
+          yield EvaluationLink.new(instance_array, link_found["properties"])
+          InactiveElseBlock.new
+        end
+      end
+
+      private
+
       # @return [Object] Object representation where all hashes are unrolled
       #   into OpenStruct objects. This exists mostly for backward
       #   compatibility, as it doesn't provide good error reporting.
-      def openstruct(object)
+      def openstruct(object, open_struct_klass=OpenStruct)
         case object
           when Hash
-            mapped = object.inject({}) { |h, (k, v)| h[k] = openstruct(v); h }
-            OpenStruct.new(mapped)
+            mapped = object.inject({}) do |h, (k, v)|
+              h[k] = openstruct(v, open_struct_klass); h
+            end
+            open_struct_klass.new(mapped)
           when Array
-            object.map { |item| openstruct(item) }
+            object.map { |item| openstruct(item, open_struct_klass) }
           else
             object
+        end
+      end
+
+      class BackCompatOpenStruct < OpenStruct
+        def methods(regular=true)
+          if regular
+            super(regular)
+          else
+            marshal_dump.keys.map(&:to_sym)
+          end
         end
       end
 
@@ -129,6 +178,10 @@ module Bosh
         def else_if_p(*names, &block)
           @context.if_p(*names, &block)
         end
+
+        def else_if_link(name, &block)
+          @context.if_link(name, &block)
+        end
       end
 
       class InactiveElseBlock
@@ -136,6 +189,10 @@ module Bosh
         end
 
         def else_if_p(*names)
+          InactiveElseBlock.new
+        end
+
+        def else_if_link(name)
           InactiveElseBlock.new
         end
       end

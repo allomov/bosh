@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'cli'
 
 describe Bosh::Cli::Command::Locks do
   let(:command) { described_class.new }
@@ -22,8 +21,9 @@ describe Bosh::Cli::Command::Locks do
     context 'when there are not any locks' do
       let(:locks) { [] }
 
-      it 'should raise a Cli Error' do
-        expect { command.locks }.to raise_error(Bosh::Cli::CliError, 'No locks')
+      it 'should list no locks' do
+        expect(command).to receive(:say).with('No locks')
+        command.locks
       end
     end
 

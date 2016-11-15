@@ -19,14 +19,14 @@ module Bosh::Monitor
       parse_json(body, Array)
     end
 
-    def get_deployment_vms(name)
-      http = perform_request(:get, "/deployments/#{name}/vms")
+    def get_deployment_instances(name)
+      http = perform_request(:get, "/deployments/#{name}/instances")
 
       body   = http.response
       status = http.response_header.http_status
 
       if status != '200'
-        raise DirectorError, "Cannot get deployment `#{name}' from director at #{http.uri}: #{status} #{body}"
+        raise DirectorError, "Cannot get deployment '#{name}' from director at #{http.uri}: #{status} #{body}"
       end
 
       parse_json(body, Array)

@@ -72,17 +72,19 @@ describe 'release lifecycle', type: :integration do
 
     bosh_runner.run('deploy')
 
-    expect_output('releases', <<-OUT)
-    +--------------+----------+-------------+
-    | Name         | Versions | Commit Hash |
-    +--------------+----------+-------------+
-    | bosh-release | 2.0*     | #{commit_hash}+   |
-    +--------------+----------+-------------+
-    (*) Currently deployed
-    (+) Uncommitted changes
+    expect_table('releases', %(
+      Acting as user 'test' on '#{current_sandbox.director_name}'
 
-    Releases total: 1
-    OUT
+      +--------------+----------+-------------+
+      | Name         | Versions | Commit Hash |
+      +--------------+----------+-------------+
+      | bosh-release | 2.0*     | #{commit_hash}+   |
+      +--------------+----------+-------------+
+      (*) Currently deployed
+      (+) Uncommitted changes
+
+      Releases total: 1
+    ))
   end
 
   # ~57s
@@ -121,32 +123,33 @@ describe 'release lifecycle', type: :integration do
     expect(out).to match /bosh-release.+0\+dev\.1.*0\+dev\.2/m
 
     bosh_runner.run('delete release bosh-release 0+dev.2')
-    expect_output('releases', <<-OUT)
-    +--------------+----------+-------------+
-    | Name         | Versions | Commit Hash |
-    +--------------+----------+-------------+
-    | bosh-release | 0+dev.1  | #{commit_hash}    |
-    +--------------+----------+-------------+
+    expect_table('releases', %(
+      Acting as user 'test' on '#{current_sandbox.director_name}'
 
-    Releases total: 1
-    OUT
+      +--------------+----------+-------------+
+      | Name         | Versions | Commit Hash |
+      +--------------+----------+-------------+
+      | bosh-release | 0+dev.1  | #{commit_hash}    |
+      +--------------+----------+-------------+
+
+      Releases total: 1
+    ))
 
     bosh_runner.run('delete release bosh-release 0+dev.1')
-    expect_output('releases', <<-OUT )
-    No releases
-    OUT
+    expect { bosh_runner.run('releases') }
+      .to raise_error(RuntimeError, /No releases/)
   end
 
   it 'verifies a sample valid release', no_reset: true do
     release_filename = spec_asset('test_release.tgz')
     out = bosh_runner.run("verify release #{release_filename}")
-    expect(out).to match(regexp("`#{release_filename}' is a valid release"))
+    expect(out).to match(regexp("'#{release_filename}' is a valid release"))
   end
 
   it 'points to an error on invalid release', no_reset: true do
     release_filename = spec_asset('release_invalid_checksum.tgz')
     out = bosh_runner.run("verify release #{release_filename}", failure_expected: true)
-    expect(out).to match(regexp("`#{release_filename}' is not a valid release"))
+    expect(out).to match(regexp("'#{release_filename}' is not a valid release"))
   end
 
   def with_changed_release

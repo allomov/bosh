@@ -1,26 +1,41 @@
-module Bosh
-  module Director
-    module DeploymentPlan
-      class DeploymentRepo
+module Bosh::Director
+  module DeploymentPlan
+    class DeploymentRepo
 
-        def initialize(canonicalizer)
-          @canonicalizer = canonicalizer
+      def find_or_create_by_name(name, options={})
+        attributes = {name: name}
+        deployment = Bosh::Director::Models::Deployment.find(attributes)
+
+        if deployment and deployment.name != name
+          # mysql database is case-insensitive by default, so we might have a
+          # deployment which doesn't exactly match the requested name
+          deployment = nil
         end
 
-        def find_or_create_by_name(name)
-          deployment = Models::Deployment.find(name: name)
-          return deployment if deployment
+        return deployment if deployment
 
-          canonical_name = @canonicalizer.canonical(name)
-          Models::Deployment.db.transaction do
-            Models::Deployment.each do |other|
-              if @canonicalizer.canonical(other.name) == canonical_name
+        if options['scopes']
+          team_scopes = Bosh::Director::Models::Team.transform_admin_team_scope_to_teams(options['scopes'])
+          attributes.merge!(teams: team_scopes)
+        end
+
+        create_for_attributes(attributes)
+      end
+
+      private
+
+      def create_for_attributes(attributes)
+        canonical_name = Canonicalizer.canonicalize(attributes[:name])
+        transactor = Transactor.new
+        transactor.retryable_transaction(Models::Deployment.db) do
+          Bosh::Director::Models::Deployment.each do |other|
+            if Canonicalizer.canonicalize(other.name) == canonical_name
                 raise DeploymentCanonicalNameTaken,
-                  "Invalid deployment name `#{name}', canonical name already taken (`#{canonical_name}')"
-              end
+                "Invalid deployment name '#{attributes[:name]}', canonical name already taken ('#{canonical_name}')"
             end
-            Models::Deployment.create(name: name)
           end
+
+          Bosh::Director::Models::Deployment.create_with_teams(attributes)
         end
       end
     end

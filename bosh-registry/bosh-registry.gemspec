@@ -20,19 +20,11 @@ Gem::Specification.new do |spec|
   spec.bindir       = 'bin'
   spec.executables  = %w(bosh-registry bosh-registry-migrate)
 
-  spec.add_dependency 'sequel',    '~>3.43.0'
+  spec.add_dependency 'sequel',    '~>4.32.0'
   spec.add_dependency 'sinatra',   '~>1.4.2'
   spec.add_dependency 'thin',      '~>1.5.0'
   spec.add_dependency 'yajl-ruby', '~>1.2.0'
-  spec.add_dependency 'fog'
+  spec.add_dependency 'fog-openstack'
   spec.add_dependency 'aws-sdk'
   spec.add_dependency 'bosh_cpi', "~>#{version}"
-
-  spec.add_development_dependency 'rake'
-  spec.add_development_dependency 'rspec'
-  spec.add_development_dependency 'rspec-its'
-  spec.add_development_dependency 'mono_logger'
-  spec.add_development_dependency 'rack-test'
-  spec.add_development_dependency 'sqlite3'
-  spec.add_development_dependency 'httpclient'
 end

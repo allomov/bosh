@@ -3,7 +3,10 @@ require 'spec_helper'
 describe 'cli: stemcell', type: :integration do
   with_reset_sandbox_before_each
 
-  let(:expected_id) { Digest::SHA1.hexdigest("STEMCELL\n") } # this is the contents of image file
+  # NOTE: The dummy CPI derives stemcell IDs from the SHA1 of the contained
+  # "image" file. If that file changes, update the value here using:
+  # `shasum image`
+  let(:expected_id) { '68aab7c44c857217641784806e2eeac4a3a99d1c' }
 
   it 'verifies a sample valid stemcell', no_reset: true do
     stemcell_filename = spec_asset('valid_stemcell.tgz')
@@ -13,7 +16,7 @@ describe 'cli: stemcell', type: :integration do
 
   it 'points to an error when verifying an invalid stemcell', no_reset: true do
     stemcell_filename = spec_asset('stemcell_invalid_mf.tgz')
-    failure = regexp("`#{stemcell_filename}' is not a valid stemcell")
+    failure = regexp("'#{stemcell_filename}' is not a valid stemcell")
     expect(bosh_runner.run("verify stemcell #{stemcell_filename}", failure_expected: true)).to match(failure)
   end
 
@@ -46,16 +49,23 @@ describe 'cli: stemcell', type: :integration do
     stemcell_path = File.join(current_sandbox.cloud_storage_dir, "stemcell_#{expected_id}")
     expect(File).to be_exists(stemcell_path)
     out = bosh_runner.run('delete stemcell ubuntu-stemcell 1')
-    expect(out).to match /Deleted stemcell `ubuntu-stemcell\/1'/
+    expect(out).to match /Deleted stemcell 'ubuntu-stemcell\/1'/
     stemcell_path = File.join(current_sandbox.cloud_storage_dir, "stemcell_#{expected_id}")
     expect(File).not_to be_exists(stemcell_path)
+  end
+
+  it 'errors when --sha1 is used when uploading a local stemcell' do
+    target_and_login
+    expect {
+      bosh_runner.run("upload stemcell #{spec_asset('valid_stemcell.tgz')} --sha1 shawone")
+    }.to raise_error(RuntimeError, /Option '--sha1' is not supported for uploading local stemcell/)
   end
 
   context 'when stemcell is in use by a deployment' do
     it 'refuses to delete it' do
       deploy_from_scratch
       results = bosh_runner.run('delete stemcell ubuntu-stemcell 1', failure_expected: true)
-      expect(results).to include("Stemcell `ubuntu-stemcell/1' is still in use by: simple")
+      expect(results).to include("Stemcell 'ubuntu-stemcell/1' is still in use by: simple")
     end
   end
 
@@ -69,7 +79,7 @@ describe 'cli: stemcell', type: :integration do
       context 'when using the --skip-if-exists flag' do
         it 'tells the user and does not exit as a failure' do
           output = bosh_runner.run("upload stemcell #{local_stemcell_path} --skip-if-exists")
-          expect(output).to include("Stemcell `ubuntu-stemcell/1' already exists. Skipping upload.")
+          expect(output).to include("Stemcell 'ubuntu-stemcell/1' already exists. Skipping upload.")
         end
       end
 
@@ -79,7 +89,7 @@ describe 'cli: stemcell', type: :integration do
             failure_expected: true,
             return_exit_code: true,
           })
-          expect(output).to include("Stemcell `ubuntu-stemcell/1' already exists")
+          expect(output).to include("Stemcell 'ubuntu-stemcell/1' already exists")
           expect(exit_code).to eq(1)
         end
       end
@@ -94,6 +104,34 @@ describe 'cli: stemcell', type: :integration do
           expect(exit_code).to eq(1)
         end
 
+        it 'fails to execute when --name flag also used' do
+          output, exit_code = bosh_runner.run("upload stemcell #{local_stemcell_path} --name dummy --fix", {
+             failure_expected: true,
+             return_exit_code: true,
+          })
+          expect(output).to include("Options '--name' and '--version' should not be used together with option '--fix'")
+          expect(exit_code).to eq(1)
+        end
+
+        it 'fails to execute when --version flag also used' do
+          output, exit_code = bosh_runner.run("upload stemcell #{local_stemcell_path} --version 1 --fix", {
+             failure_expected: true,
+             return_exit_code: true,
+          })
+          expect(output).to include("Options '--name' and '--version' should not be used together with option '--fix'")
+          expect(exit_code).to eq(1)
+        end
+
+        it 'fails to execute when --name and --version flags also used' do
+          output, exit_code = bosh_runner.run("upload stemcell #{local_stemcell_path} --name dummy --version 1 --fix", {
+             failure_expected: true,
+             return_exit_code: true,
+          })
+          expect(output).to include("Options '--name' and '--version' should not be used together with option '--fix'")
+          expect(exit_code).to eq(1)
+        end
+
+
         it 'uploads stemcell' do
           # Check existing stemcell information
           out = bosh_runner.run('stemcells')
@@ -106,7 +144,7 @@ describe 'cli: stemcell', type: :integration do
           expect(File).to be_exists(stemcell_path)
 
           # Upload a new stemcell with same version and name as the existing one, but is of different image content
-          new_id = Digest::SHA1.hexdigest("STEMCELL_1\n")
+          new_id = 'adc4232dcd3e06779c058224054d3d3238041367'
           new_local_stemcell_path = spec_asset('valid_stemcell_with_different_content.tgz')
           output = bosh_runner.run("upload stemcell #{new_local_stemcell_path} --fix")
           expect(output).to match /Stemcell uploaded and created/
@@ -168,17 +206,14 @@ describe 'cli: stemcell', type: :integration do
         context 'when using the --skip-if-exists flag' do
           it 'tells the user and does not exit as a failure' do
             output = bosh_runner.run("upload stemcell #{stemcell_url} --skip-if-exists")
-            expect(output).to include("Stemcell at #{stemcell_url} already exists")
+            expect(output).to_not include("Uploading stemcell")
           end
         end
 
         context 'when NOT using the --skip-if-exists flag' do
           it 'tells the user and does exit as a failure' do
-            _, exit_code = bosh_runner.run("upload stemcell #{stemcell_url}", {
-              failure_expected: true,
-              return_exit_code: true,
-            })
-            expect(exit_code).to eq(1)
+            output = bosh_runner.run("upload stemcell #{stemcell_url}")
+            expect(output).to_not include("Uploading stemcell")
           end
         end
 
@@ -204,7 +239,7 @@ describe 'cli: stemcell', type: :integration do
             expect(File).to be_exists(stemcell_path)
 
             # Upload a new stemcell with same version and name as the existing one, but is of different image content
-            new_id = Digest::SHA1.hexdigest("STEMCELL_1\n")
+            new_id = 'adc4232dcd3e06779c058224054d3d3238041367'
             new_stemcell_url = file_server.http_url("valid_stemcell_with_different_content.tgz")
             output = bosh_runner.run("upload stemcell #{new_stemcell_url} --fix")
             expect(output).to match /Stemcell uploaded and created/
@@ -223,6 +258,22 @@ describe 'cli: stemcell', type: :integration do
             stemcell_path = File.join(current_sandbox.cloud_storage_dir, "stemcell_#{new_id}")
             expect(File).to be_exists(stemcell_path)
           end
+        end
+      end
+
+      context 'when a sha1 is provided' do
+        it 'accepts shas' do
+          output = bosh_runner.run("upload stemcell #{stemcell_url} --sha1 73b51e1285240898f34b0fac22aba7ad4cc6ac65")
+          expect(output).to include("Stemcell uploaded and created.")
+        end
+
+        it 'fails if the sha is incorrect' do
+          output, exit_code = bosh_runner.run("upload stemcell #{stemcell_url} --sha1 shawone", {
+            failure_expected: true,
+            return_exit_code: true,
+          })
+          expect(output).to include("Error 50007")
+          expect(exit_code).to eq(1)
         end
       end
     end

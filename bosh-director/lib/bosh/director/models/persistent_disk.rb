@@ -1,5 +1,3 @@
-# Copyright (c) 2009-2012 VMware, Inc.
-
 module Bosh::Director::Models
   class PersistentDisk < Sequel::Model(Bosh::Director::Config.db)
     many_to_one :instance
@@ -12,11 +10,19 @@ module Bosh::Director::Models
 
     def cloud_properties
       result = self.cloud_properties_json
-      result ? Yajl::Parser.parse(result) : {}
+      result ? JSON.parse(result) : {}
     end
 
     def cloud_properties=(cloud_properties)
-      self.cloud_properties_json = Yajl::Encoder.encode(cloud_properties)
+      self.cloud_properties_json = JSON.generate(cloud_properties)
+    end
+
+    def managed?
+      name == ''
+    end
+
+    def to_s
+      "#{self.name}/#{self.disk_cid}"
     end
   end
 end

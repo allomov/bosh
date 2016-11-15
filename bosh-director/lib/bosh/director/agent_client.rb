@@ -3,9 +3,12 @@ require 'bosh/director/agent_message_converter'
 module Bosh::Director
   class AgentClient
 
-    PROTOCOL_VERSION = 2
+    PROTOCOL_VERSION = 3
 
     DEFAULT_POLL_INTERVAL = 1.0
+
+    STOP_MESSAGE_TIMEOUT = 300 # 5 minutes
+    SYNC_DNS_MESSAGE_TIMEOUT = 10
 
     # in case of timeout errors
     GET_TASK_MAX_RETRIES = 2
@@ -19,12 +22,7 @@ module Bosh::Director
 
     attr_accessor :id
 
-    def self.with_defaults(id, options = {})
-      vm = Bosh::Director::Models::Vm.find(:agent_id => id)
-      with_vm(vm, options)
-    end
-
-    def self.with_vm(vm, options = {})
+    def self.with_vm_credentials_and_agent_id(vm_credentials, agent_id, options = {})
       defaults = {
         retry_methods: {
           get_state: GET_STATE_MAX_RETRIES,
@@ -32,10 +30,9 @@ module Bosh::Director
         }
       }
 
-      credentials = vm.credentials
-      defaults.merge!(credentials: credentials) if credentials
+      defaults.merge!(credentials: vm_credentials) if vm_credentials
 
-      self.new('agent', vm.agent_id, defaults.merge(options))
+      self.new('agent', agent_id, defaults.merge(options))
     end
 
     def initialize(service_name, client_id, options = {})
@@ -70,12 +67,8 @@ module Bosh::Director
       send_message(:list_disk, *args)
     end
 
-    def prepare_configure_networks(*args)
-      send_message(:prepare_configure_networks, *args)
-    end
-
-    def prepare_network_change(*args)
-      send_message(:prepare_network_change, *args)
+    def associate_disks(*args)
+      send_message(:associate_disks, *args)
     end
 
     def start(*args)
@@ -95,7 +88,7 @@ module Bosh::Director
     end
 
     def drain(*args)
-      send_message(:drain, *args)
+      send_cancellable_message(:drain, *args)
     end
 
     def fetch_logs(*args)
@@ -114,9 +107,17 @@ module Bosh::Director
       send_message(:unmount_disk, *args)
     end
 
-    def update_settings(certs)
+    def delete_arp_entries(*args)
+      fire_and_forget(:delete_arp_entries, *args)
+    end
+
+    def sync_dns(*args, &blk)
+      send_nats_request(:sync_dns, args, &blk)
+    end
+
+    def update_settings(certs, disk_associations)
       begin
-        send_message(:update_settings, {"trusted_certs" => certs})
+        send_message(:update_settings, {'trusted_certs' => certs, 'disk_associations' => disk_associations })
       rescue RpcRemoteException => e
         if e.message =~ /unknown message/
           @logger.warn("Ignoring update_settings 'unknown message' error from the agent: #{e.inspect}")
@@ -139,27 +140,35 @@ module Bosh::Director
     end
 
     def stop(*args)
-      send_message(:stop, *args)
+      timeout = Timeout.new(STOP_MESSAGE_TIMEOUT)
+      begin
+        send_message_with_timeout(:stop, timeout, *args)
+      rescue Exception => e
+        if e.message.include? 'Timed out waiting for service'
+          @logger.warn("Ignoring stop timeout error from the agent: #{e.inspect}")
+        else
+          raise
+        end
+      end
     end
 
     def run_errand(*args)
       start_task(:run_errand, *args)
     end
 
-    def wait_for_task(agent_task_id, &blk)
+    def wait_for_task(agent_task_id, timeout = nil, &blk)
       task = get_task_status(agent_task_id)
+      timed_out = false
 
-      while task['state'] == 'running'
+      until task['state'] != 'running' || (timeout && timed_out = timeout.timed_out?)
         blk.call if block_given?
         sleep(DEFAULT_POLL_INTERVAL)
         task = get_task_status(agent_task_id)
       end
 
-      task['value']
-    end
+      @logger.debug("Task #{agent_task_id} timed out") if timed_out
 
-    def configure_networks(*args)
-      send_message(:configure_networks, *args)
+      task['value']
     end
 
     def wait_until_ready(deadline = 600)
@@ -168,7 +177,11 @@ module Bosh::Director
       @deadline = Time.now.to_i + deadline
 
       begin
+        Config.job_cancelled?
         ping
+      rescue TaskCancelled => e
+        @logger.debug('Task was cancelled. Stop waiting response from vm')
+        raise e
       rescue RpcTimeout
         retry if @deadline - Time.now.to_i > 0
         raise RpcTimeout, "Timed out pinging to #{@client_id} after #{deadline} seconds"
@@ -180,6 +193,19 @@ module Bosh::Director
       end
     end
 
+    def send_nats_request(method_name, args, &callback)
+      request = { :protocol => PROTOCOL_VERSION, :method => method_name, :arguments => args }
+
+      if @encryption_handler
+        @logger.info("Request: #{request}")
+        request = {'encrypted_data' => @encryption_handler.encrypt(request) }
+        request['session_id'] = @encryption_handler.session_id
+      end
+
+      recipient = "#{@service_name}.#{@client_id}"
+      @nats_rpc.send_request(recipient, request, &callback)
+    end
+
     def handle_method(method_name, args)
       result = {}
       result.extend(MonitorMixin)
@@ -187,22 +213,12 @@ module Bosh::Director
       cond = result.new_cond
       timeout_time = Time.now.to_f + @timeout
 
-      request = { :protocol => PROTOCOL_VERSION, :method => method_name, :arguments => args }
-
-      if @encryption_handler
-        @logger.info("Request: #{request}")
-        request = { "encrypted_data" => @encryption_handler.encrypt(request) }
-        request["session_id"] = @encryption_handler.session_id
-      end
-
-      recipient = "#{@service_name}.#{@client_id}"
-
-      request_id = @nats_rpc.send_request(recipient, request) do |response|
+      request_id = send_nats_request(method_name, args) do |response|
         if @encryption_handler
           begin
-            response = @encryption_handler.decrypt(response["encrypted_data"])
+            response = @encryption_handler.decrypt(response['encrypted_data'])
           rescue Bosh::Core::EncryptionHandler::CryptError => e
-            response["exception"] = "CryptError: #{e.inspect} #{e.backtrace}"
+            response['exception'] = "CryptError: #{e.inspect} #{e.backtrace}"
           end
           @logger.info("Response: #{response}")
         end
@@ -217,21 +233,21 @@ module Bosh::Director
       result.synchronize do
         while result.empty?
           timeout = timeout_time - Time.now.to_f
-          unless timeout > 0
+          if timeout <= 0
             @nats_rpc.cancel_request(request_id)
             raise RpcTimeout,
-              "Timed out sending `#{method_name}' to #{@client_id} " +
+              "Timed out sending '#{method_name}' to #{@client_id} " +
                 "after #{@timeout} seconds"
           end
           cond.wait(timeout)
         end
       end
 
-      if result.has_key?("exception")
-        raise RpcRemoteException, format_exception(result["exception"])
+      if result.has_key?('exception')
+        raise RpcRemoteException, format_exception(result['exception'])
       end
 
-      result["value"]
+      result['value']
     end
 
     # Returns formatted exception information
@@ -240,15 +256,15 @@ module Bosh::Director
     def format_exception(exception)
       return exception.to_s unless exception.is_a?(Hash)
 
-      msg = exception["message"].to_s
+      msg = exception['message'].to_s
 
-      if exception["backtrace"]
+      if exception['backtrace']
         msg += "\n"
-        msg += Array(exception["backtrace"]).join("\n")
+        msg += Array(exception['backtrace']).join("\n")
       end
 
-      if exception["blobstore_id"]
-        blob = download_and_delete_blob(exception["blobstore_id"])
+      if exception['blobstore_id']
+        blob = download_and_delete_blob(exception['blobstore_id'])
         msg += "\n"
         msg += blob.to_s
       end
@@ -262,11 +278,11 @@ module Bosh::Director
     # but if there is a crash before it is injected into the response
     # and then logged, there is a chance that we lose it
     def inject_compile_log(response)
-      if response["value"] && response["value"].is_a?(Hash) &&
-        response["value"]["result"].is_a?(Hash) &&
-        blob_id = response["value"]["result"]["compile_log_id"]
+      if response['value'] && response['value'].is_a?(Hash) &&
+        response['value']['result'].is_a?(Hash) &&
+        blob_id = response['value']['result']['compile_log_id']
         compile_log = download_and_delete_blob(blob_id)
-        response["value"]["result"]["compile_log"] = compile_log
+        response['value']['result']['compile_log'] = compile_log
       end
     end
 
@@ -293,6 +309,12 @@ module Bosh::Director
       end
     end
 
+    def fire_and_forget(message_name, *args)
+      send_nats_request(message_name, args)
+    rescue => e
+      @logger.warn("Ignoring '#{e.message}' error from the agent: #{e.inspect}. Received while trying to run: #{message_name} on client: '#{@client_id}'")
+    end
+
     def send_message(method_name, *args, &blk)
       task = start_task(method_name, *args)
       if task['agent_task_id']
@@ -301,6 +323,31 @@ module Bosh::Director
         task['value']
       end
     end
+
+    def send_message_with_timeout(method_name, timeout, *args, &blk)
+      task = start_task(method_name, *args)
+
+      if task['agent_task_id']
+        wait_for_task(task['agent_task_id'], timeout, &blk)
+      else
+        task['value']
+      end
+    end
+
+    def send_cancellable_message(method_name, *args)
+      task = start_task(method_name, *args)
+      if task['agent_task_id']
+        begin
+          wait_for_task(task['agent_task_id']) { Config.job_cancelled? }
+        rescue TaskCancelled => e
+          cancel_task(task['agent_task_id'])
+          raise e
+        end
+      else
+        task['value']
+      end
+    end
+
 
     def start_task(method_name, *args)
       AgentMessageConverter.convert_old_message_to_new(handle_message_with_retry(method_name, *args))

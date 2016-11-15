@@ -12,9 +12,11 @@ describe 'CentOS 7 stemcell', stemcell_image: true do
 
   context 'installed by image_vsphere_cdrom stage', {
     exclude_on_aws: true,
+    exclude_on_google: true,
     exclude_on_vcloud: true,
     exclude_on_warden: true,
     exclude_on_openstack: true,
+    exclude_on_azure: true,
   } do
     describe file('/etc/udev/rules.d/60-cdrom_id.rules') do
       it { should be_file }
@@ -46,9 +48,11 @@ HERE
 
   context 'installed by bosh_openstack_agent_settings', {
     exclude_on_aws: true,
+    exclude_on_google: true,
     exclude_on_vcloud: true,
     exclude_on_vsphere: true,
     exclude_on_warden: true,
+    exclude_on_azure: true,
   } do
     describe file('/var/vcap/bosh/agent.json') do
       it { should be_valid_json_file }
@@ -57,11 +61,30 @@ HERE
       it { should contain('"Type": "HTTP"') }
     end
   end
+
+  context 'installed by dev_tools_config' do
+    describe file('/var/vcap/bosh/etc/dev_tools_file_list') do
+      it { should contain('/usr/bin/gcc') }
+    end
+  end
+
+  describe 'mounted file systems: /etc/fstab should mount nfs with nodev (stig: V-38654)(stig: V-38652)' do
+    describe file('/etc/fstab') do
+      it { should be_file }
+      its (:content) { should_not match /nfs/ }
+    end
+  end
 end
 
 describe 'CentOS 7 stemcell tarball', stemcell_tarball: true do
   context 'installed by bosh_rpm_list stage' do
     describe file("#{ENV['STEMCELL_WORKDIR']}/stemcell/stemcell_rpm_qa.txt") do
+      it { should be_file }
+    end
+  end
+
+  context 'installed by dev_tools_config stage' do
+    describe file("#{ENV['STEMCELL_WORKDIR']}/stemcell/dev_tools_file_list.txt") do
       it { should be_file }
     end
   end

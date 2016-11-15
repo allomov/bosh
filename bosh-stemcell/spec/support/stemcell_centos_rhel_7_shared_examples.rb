@@ -4,7 +4,7 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
     its(:stdout) {should eq "1\n"}
   end
 
-  context 'installed by image_install_grub', exclude_on_warden: true do
+  context 'installed by image_install_grub' do
     describe file('/etc/fstab') do
       it { should be_file }
       it { should contain 'UUID=' }
@@ -37,6 +37,7 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
       it('should be of mode 600 (stig: V-38583)') { should be_mode('600') }
       it('should be owned by root (stig: V-38579)') { should be_owned_by('root') }
       it('should be grouped into root (stig: V-38581)') { should be_grouped_into('root') }
+      it('audits processes that start prior to auditd (CIS-8.1.3)') { should contain ' audit=1' }
     end
   end
 
@@ -54,12 +55,22 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
     end
   end
 
-  context 'installed by the system_network stage', exclude_on_warden: true do
+  context 'installed by system-network on all IaaSes', { exclude_on_warden: true } do
+    describe file('/etc/hostname') do
+      it { should be_file }
+      its (:content) { should eq('bosh-stemcell') }
+    end
+  end
+
+  context 'installed by the system_network stage', {
+    exclude_on_warden: true,
+    exclude_on_azure: true,
+  } do
     describe file('/etc/sysconfig/network') do
       it { should be_file }
       it { should contain 'NETWORKING=yes' }
       it { should contain 'NETWORKING_IPV6=no' }
-      it { should contain 'HOSTNAME=localhost.localdomain' }
+      it { should contain 'HOSTNAME=bosh-stemcell' }
       it { should contain 'NOZEROCONF=yes' }
     end
 
@@ -70,11 +81,38 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
     end
   end
 
+  context 'installed by the system_azure_network stage', {
+    exclude_on_aws: true,
+    exclude_on_google: true,
+    exclude_on_vcloud: true,
+    exclude_on_vsphere: true,
+    exclude_on_warden: true,
+    exclude_on_openstack: true,
+  } do
+    describe file('/etc/sysconfig/network') do
+      it { should be_file }
+      it { should contain 'NETWORKING=yes' }
+      it { should contain 'NETWORKING_IPV6=no' }
+      it { should contain 'HOSTNAME=bosh-stemcell' }
+      it { should contain 'NOZEROCONF=yes' }
+    end
+
+    describe file('/etc/sysconfig/network-scripts/ifcfg-eth0') do
+      it { should be_file }
+      it { should contain 'DEVICE=eth0' }
+      it { should contain 'BOOTPROTO=dhcp' }
+      it { should contain 'ONBOOT=on' }
+      it { should contain 'TYPE="Ethernet"' }
+    end
+  end
+
   context 'installed by bosh_aws_agent_settings', {
+    exclude_on_google: true,
     exclude_on_openstack: true,
     exclude_on_vcloud: true,
     exclude_on_vsphere: true,
     exclude_on_warden: true,
+    exclude_on_azure: true,
   } do
     describe file('/var/vcap/bosh/agent.json') do
       it { should be_valid_json_file }
@@ -82,15 +120,50 @@ shared_examples_for 'a CentOS 7 or RHEL 7 stemcell' do
     end
   end
 
+  context 'installed by bosh_google_agent_settings', {
+    exclude_on_aws: true,
+    exclude_on_openstack: true,
+    exclude_on_vcloud: true,
+    exclude_on_vsphere: true,
+    exclude_on_warden: true,
+    exclude_on_azure: true,
+  } do
+    describe file('/var/vcap/bosh/agent.json') do
+      it { should be_valid_json_file }
+      it { should contain('"Type": "InstanceMetadata"') }
+    end
+  end
+
   context 'installed by bosh_vsphere_agent_settings', {
     exclude_on_aws: true,
+    exclude_on_google: true,
     exclude_on_vcloud: true,
     exclude_on_openstack: true,
     exclude_on_warden: true,
+    exclude_on_azure: true,
    } do
     describe file('/var/vcap/bosh/agent.json') do
       it { should be_valid_json_file }
       it { should contain('"Type": "CDROM"') }
+    end
+  end
+
+  context 'installed by bosh_azure_agent_settings', {
+    exclude_on_aws: true,
+    exclude_on_google: true,
+    exclude_on_vcloud: true,
+    exclude_on_vsphere: true,
+    exclude_on_warden: true,
+    exclude_on_openstack: true,
+  } do
+    describe file('/var/vcap/bosh/agent.json') do
+      it { should be_valid_json_file }
+      it { should contain('"Type": "File"') }
+      it { should contain('"MetaDataPath": ""') }
+      it { should contain('"UserDataPath": "/var/lib/waagent/CustomData"') }
+      it { should contain('"SettingsPath": "/var/lib/waagent/CustomData"') }
+      it { should contain('"UseServerName": true') }
+      it { should contain('"UseRegistry": true') }
     end
   end
 end

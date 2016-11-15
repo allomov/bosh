@@ -5,21 +5,21 @@ describe Bhm::Plugins::ResurrectorHelper::AlertTracker do
     let(:agents) {
       agents = {}
       100.times.each do |i|
-        agents["00#{i}"]= Bhm::Agent.new("00#{i}", deployment: 'deployment', job: "00#{i}", index: i.to_s)
+        agents["00#{i}"]= Bhm::Agent.new("00#{i}", deployment: 'deployment', job: "00#{i}", instance_id: "uuid#{i.to_s}")
       end
       agents
     }
 
     let(:job_instance_keys) {
       100.times.map do |i|
-        Bhm::Plugins::ResurrectorHelper::JobInstanceKey.new('deployment', "00#{i}", i.to_s)
+        Bhm::Plugins::ResurrectorHelper::JobInstanceKey.new('deployment', "00#{i}", "uuid#{i.to_s}")
       end
     }
 
     before do
-      mock_agent_manager = double(Bhm::AgentManager)
-      allow(mock_agent_manager).to receive(:get_agents_for_deployment).with('deployment').and_return(agents)
-      allow(Bhm).to receive_messages(agent_manager: mock_agent_manager)
+      mock_instance_manager = double(Bhm::InstanceManager)
+      allow(mock_instance_manager).to receive(:get_agents_for_deployment).with('deployment').and_return(agents)
+      allow(Bhm).to receive_messages(instance_manager: mock_instance_manager)
     end
 
     it 'is melting down if more than 30% of agents are down' do
@@ -42,7 +42,7 @@ describe Bhm::Plugins::ResurrectorHelper::AlertTracker do
 
       expect(alert_tracker.melting_down?('deployment')).to be(false)
     end
-    
+
     it 'is not melting down if all agents are responding' do
       alert_tracker = described_class.new('percent_threshold' => 0.0)
 
@@ -53,8 +53,8 @@ end
 
 describe Bhm::Plugins::ResurrectorHelper::JobInstanceKey do
   it 'hashes properly' do
-    key1 = described_class.new('deployment', 'job', 0)
-    key2 = described_class.new('deployment', 'job', 0)
+    key1 = described_class.new('deployment', 'job', 'uuid0')
+    key2 = described_class.new('deployment', 'job', 'uuid0')
     hash = { key1 => 'foo' }
 
     expect(hash[key2]).to eq('foo')

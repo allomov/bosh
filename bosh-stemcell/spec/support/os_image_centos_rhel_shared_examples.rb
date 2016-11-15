@@ -22,7 +22,6 @@ shared_examples_for 'a CentOS or RHEL based OS image' do
     end
 
     describe file('/etc/localtime') do
-      it { should be_file }
       it { should contain 'UTC' }
     end
 
@@ -101,6 +100,36 @@ shared_examples_for 'a CentOS or RHEL based OS image' do
   context 'package signature verification (stig: V-38462)' do
     describe command('grep nosignature /etc/rpmrc /usr/lib/rpm/rpmrc /usr/lib/rpm/redhat/rpmrc ~root/.rpmrc') do
       its (:stdout) { should_not include('nosignature') }
+    end
+  end
+
+  context 'X Windows must not be enabled unless required (stig: V-38674)' do
+    describe package('xorg-x11-server-Xorg') do
+      it { should_not be_installed }
+    end
+  end
+
+  context 'login and password restrictions' do
+    describe file('/etc/pam.d/system-auth') do
+      it 'must prohibit the reuse of passwords within twenty-four iterations (stig: V-38658)' do
+        should contain /password.*pam_unix\.so.*remember=24/
+      end
+
+      it 'must prohibit new passwords shorter than 14 characters (stig: V-38475)' do
+        should contain /password.*pam_unix\.so.*minlen=14/
+      end
+
+      it 'must restrict a user account after 5 failed login attempts (stig: V-38573 V-38501)' do
+        should contain(/auth.*pam_faillock\.so.*authfail.*deny=5.*fail_interval=900/).from(/auth.*pam_unix.so/).to(/auth.*pam_faillock.so.*authsucc/)
+        should contain(/auth.*pam_faillock\.so.*authsucc.*deny=5.*fail_interval=900/).from(/auth.*pam_faillock\.so.*authfail/).to(/auth.*pam_deny\.so/)
+      end
+    end
+
+    describe file('/etc/pam.d/password-auth') do
+      it 'must restrict a user account after 5 failed login attempts (stig: V-38573 V-38501)' do
+        should contain(/auth.*pam_faillock\.so.*authfail.*deny=5.*fail_interval=900/).from(/auth.*pam_unix.so/).to(/auth.*pam_faillock.so.*authsucc/)
+        should contain(/auth.*pam_faillock\.so.*authsucc.*deny=5.*fail_interval=900/).from(/auth.*pam_faillock\.so.*authfail/).to(/auth.*pam_deny\.so/)
+      end
     end
   end
 end

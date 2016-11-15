@@ -1,6 +1,8 @@
 require 'spec_helper'
 
 describe 'vCloud Stemcell', stemcell_image: true do
+  it_behaves_like 'udf module is disabled'
+
   context 'installed by system_parameters' do
     describe file('/var/vcap/bosh/etc/infrastructure') do
       it { should contain('vsphere') }
@@ -12,6 +14,7 @@ describe 'vCloud Stemcell', stemcell_image: true do
       subject { file('/etc/ssh/sshd_config') }
 
       it { should_not contain /^PasswordAuthentication no$/ }
+      it { should contain /^PasswordAuthentication yes$/ }
     end
   end
 end

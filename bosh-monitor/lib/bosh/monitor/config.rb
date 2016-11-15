@@ -6,8 +6,9 @@ module Bosh::Monitor
     attr_accessor :director
     attr_accessor :intervals
     attr_accessor :mbus
+    attr_accessor :em_threadpool_size
     attr_accessor :event_mbus
-    attr_accessor :agent_manager
+    attr_accessor :instance_manager
     attr_accessor :event_processor
 
     attr_accessor :http_port
@@ -23,8 +24,10 @@ module Bosh::Monitor
       @director = Director.new(config["director"], @logger)
       @mbus = OpenStruct.new(config["mbus"])
 
+      @em_threadpool_size = config["em_threadpool_size"]
+
       @event_processor = EventProcessor.new
-      @agent_manager = AgentManager.new(event_processor)
+      @instance_manager = InstanceManager.new(event_processor)
 
       # Interval defaults
       @intervals.prune_events ||= 30
@@ -32,6 +35,7 @@ module Bosh::Monitor
       @intervals.poll_grace_period ||= 30
       @intervals.log_stats ||= 60
       @intervals.analyze_agents ||= 60
+      @intervals.analyze_instances ||= 60
       @intervals.agent_timeout ||= 60
       @intervals.rogue_agent_alert ||= 120
 

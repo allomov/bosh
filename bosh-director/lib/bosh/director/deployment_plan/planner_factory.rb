@@ -12,188 +12,232 @@ module Bosh
       end
 
       class PlannerFactory
-        def self.create(event_log, logger)
+        include ValidationHelper
+
+        def self.create(logger)
           deployment_manifest_migrator = Bosh::Director::DeploymentPlan::ManifestMigrator.new
-          canonicalizer = Class.new { include Bosh::Director::DnsHelper }.new
-          deployment_repo = Bosh::Director::DeploymentPlan::DeploymentRepo.new(canonicalizer)
+          manifest_validator = Bosh::Director::DeploymentPlan::ManifestValidator.new
+          deployment_repo = Bosh::Director::DeploymentPlan::DeploymentRepo.new
 
           new(
-            canonicalizer,
             deployment_manifest_migrator,
+            manifest_validator,
             deployment_repo,
-            event_log,
             logger
           )
         end
 
-        def initialize(canonicalizer, deployment_manifest_migrator, deployment_repo, event_log, logger)
-          @canonicalizer = canonicalizer
+        def initialize(deployment_manifest_migrator, manifest_validator, deployment_repo, logger)
           @deployment_manifest_migrator = deployment_manifest_migrator
+          @manifest_validator = manifest_validator
           @deployment_repo = deployment_repo
-          @event_log = event_log
           @logger = logger
         end
 
-        def planner(manifest_hash, cloud_config, plan_options)
-          planner = planner_without_vm_binding(manifest_hash, cloud_config, plan_options)
-          bind_vms(planner)
+        def create_from_model(deployment_model, options={})
+          manifest = Manifest.load_from_model(deployment_model)
+          create_from_manifest(manifest, deployment_model.cloud_config, deployment_model.runtime_config, options)
         end
 
-        def planner_without_vm_binding(manifest_hash, cloud_config, options)
-          deployment_manifest, cloud_manifest = @deployment_manifest_migrator.migrate(manifest_hash, cloud_config)
-          name = deployment_manifest['name']
-
-          deployment_model = nil
-          @event_log.track('Binding deployment') do
-            @logger.info('Binding deployment')
-            deployment_model = @deployment_repo.find_or_create_by_name(name)
-          end
-
-          attrs = {
-            name: name,
-            properties: deployment_manifest.fetch('properties', {}),
-          }
-          assemble_without_vm_binding(attrs, deployment_manifest, cloud_manifest, deployment_model, cloud_config, options)
+        def create_from_manifest(manifest, cloud_config, runtime_config, options)
+          parse_from_manifest(manifest, cloud_config, runtime_config, options)
         end
 
         private
 
-        def deployment_name(manifest_hash)
-          name = manifest_hash['name']
-          @canonicalizer.canonical(name)
-        end
+        def parse_from_manifest(manifest, cloud_config, runtime_config, options)
+          @manifest_validator.validate(manifest.hybrid_manifest_hash, manifest.cloud_config_hash)
 
-        def assemble_without_vm_binding(attrs, deployment_manifest, cloud_manifest, deployment_model, cloud_config, options)
+          migrated_manifest_object, cloud_manifest = @deployment_manifest_migrator.migrate(manifest, manifest.cloud_config_hash)
+          manifest.resolve_aliases
+          migrated_hybrid_manifest_hash = migrated_manifest_object.hybrid_manifest_hash
+          @logger.debug("Migrated deployment manifest:\n#{migrated_manifest_object.raw_manifest_hash}")
+          @logger.debug("Migrated cloud config manifest:\n#{cloud_manifest}")
+          name = migrated_hybrid_manifest_hash['name']
+
+          deployment_model = @deployment_repo.find_or_create_by_name(name, options)
+
+          attrs = {
+            name: name,
+            properties: migrated_hybrid_manifest_hash.fetch('properties', {}),
+          }
+
           plan_options = {
             'recreate' => !!options['recreate'],
+            'fix' => !!options['fix'],
             'skip_drain' => options['skip_drain'],
             'job_states' => options['job_states'] || {},
-            'job_rename' => options['job_rename'] || {}
+            'max_in_flight' => validate_and_get_argument(options['max_in_flight'], 'max_in_flight'),
+            'canaries' => validate_and_get_argument(options['canaries'], 'canaries'),
+            'tags' => parse_tags(migrated_hybrid_manifest_hash, runtime_config),
           }
+
           @logger.info('Creating deployment plan')
           @logger.info("Deployment plan options: #{plan_options}")
 
-          deployment = Planner.new(attrs, deployment_manifest, cloud_config, deployment_model, plan_options)
-          deployment = CloudManifestParser.new(deployment, @logger).parse(cloud_manifest)
-          DeploymentSpecParser.new(deployment, @event_log, @logger).parse(deployment_manifest, plan_options)
-        end
+          deployment = Planner.new(attrs, migrated_manifest_object.raw_manifest_hash, cloud_config, runtime_config, deployment_model, plan_options)
+          global_network_resolver = GlobalNetworkResolver.new(deployment, Config.director_ips, @logger)
+          ip_provider_factory = IpProviderFactory.new(deployment.using_global_networking?, @logger)
+          deployment.cloud_planner = CloudManifestParser.new(@logger).parse(cloud_manifest, global_network_resolver, ip_provider_factory)
 
-        def bind_vms(planner)
-          stemcell_manager = Api::StemcellManager.new
-          cloud = Config.cloud
-          blobstore = nil # not used for this assembler purposes
-          director_job = nil
-          assembler = DeploymentPlan::Assembler.new(
-            planner,
-            stemcell_manager,
-            cloud,
-            blobstore,
-            @logger,
-            @event_log
-          )
-          @logger.info('Created deployment plan')
+          DeploymentSpecParser.new(deployment, Config.event_log, @logger).parse(migrated_hybrid_manifest_hash, plan_options)
 
-          run_prepare_step(assembler)
+          if runtime_config
+            parsed_runtime_config =  RuntimeConfig::RuntimeManifestParser.new.parse(runtime_config.manifest)
 
-          validate_packages(planner)
-
-          DeploymentPlan::Steps::PackageCompileStep.new(
-            planner,
-            cloud,
-            @logger,
-            @event_log,
-            director_job
-          ).perform
-          @event_log.begin_stage('Preparing DNS', 1)
-          track_and_log('Binding DNS') do
-            assembler.bind_dns
+            #TODO: only add releases for runtime jobs that will be added.
+            parsed_runtime_config.releases.each do |release|
+              release.add_to_deployment(deployment)
+            end
+            parsed_runtime_config.addons.each do |addon|
+              addon.add_to_deployment(deployment)
+            end
           end
 
-          planner
+          process_links(deployment)
+
+          DeploymentValidator.new.validate(deployment)
+
+          deployment
         end
 
-        def validate_packages(planner)
-          faults = {}
-          release_manager = Bosh::Director::Api::ReleaseManager.new
-          planner.jobs.each { |job|
-            job.templates.each{ |template|
-              release_model = release_manager.find_by_name(template.release.name)
-              template.package_models.each{ |package|
+        def parse_tags(manifest_hash, runtime_config)
+          tags = {}
 
-                release_version_model = release_manager.find_version(release_model, template.release.version)
-                packages_list = release_version_model.transitive_dependencies(package)
-                packages_list << package
+          if manifest_hash.has_key?('tags')
+            safe_property(manifest_hash, 'tags', :class => Hash).each_pair do |key, value|
+              tags[key] = value
+            end
+          end
 
-                release_desc = "#{release_version_model.release.name}/#{release_version_model.version}"
+          runtime_config.nil? ? tags : runtime_config.tags.merge!(tags)
+        end
 
-                packages_list.each { |needed_package|
-                  if needed_package.sha1.nil? || needed_package.blobstore_id.nil?
-                    compiled_packages_list = Bosh::Director::Models::CompiledPackage[:package_id => needed_package.id, :stemcell_id => job.resource_pool.stemcell.model.id]
-                    if compiled_packages_list.nil?
-                      (faults[release_desc] ||= []) << {:package => needed_package, :stemcell => job.resource_pool.stemcell.model}
-                    end
+        def process_links(deployment)
+          errors = []
+
+          deployment.instance_groups.each do |current_instance_group|
+            current_instance_group.jobs.each do |current_job|
+              current_job.consumes_links_for_instance_group_name(current_instance_group.name).each do |name, source|
+                link_path = LinkPath.new(deployment.name, deployment.instance_groups, current_instance_group.name, current_job.name)
+
+                begin
+                  link_path.parse(source)
+                rescue Exception => e
+                  errors.push e
+                end
+
+                if !link_path.skip
+                  current_instance_group.add_link_path(current_job.name, name, link_path)
+                end
+              end
+
+              template_properties = current_job.properties[current_instance_group.name]
+
+              current_job.provides_links_for_instance_group_name(current_instance_group.name).each do |link_name, provided_link|
+                if provided_link['link_properties_exported']
+                  ## Get default values for this job
+                  default_properties = get_default_properties(deployment, current_job)
+
+                  provided_link['mapped_properties'] = process_link_properties(template_properties, default_properties, provided_link['link_properties_exported'], errors)
+                end
+              end
+            end
+          end
+
+          if errors.length > 0
+            message = 'Unable to process links for deployment. Errors are:'
+
+            errors.each do |e|
+              message = "#{message}\n   - #{e.message.gsub(/\n/, "\n     ")}"
+            end
+
+            raise message
+          end
+        end
+
+        def get_default_properties(deployment, template)
+          release_manager = Api::ReleaseManager.new
+
+          release_versions_templates_models_hash = {}
+
+          template_name = template.name
+          release_name = template.release.name
+
+          release = deployment.release(release_name)
+
+          if !release_versions_templates_models_hash.has_key?(release_name)
+            release_model = release_manager.find_by_name(release_name)
+            current_release_version = release_manager.find_version(release_model, release.version)
+            release_versions_templates_models_hash[release_name] = current_release_version.templates
+          end
+
+          templates_models_list = release_versions_templates_models_hash[release_name]
+          current_template_model = templates_models_list.find {|target| target.name == template_name }
+
+          if current_template_model.properties != nil
+            default_prop = {}
+            default_prop['properties'] = current_template_model.properties
+            default_prop["template_name"] = template.name
+            return default_prop
+          end
+
+          return {"template_name" => template.name}
+        end
+
+        def process_link_properties(scoped_properties, default_properties, link_property_list, errors)
+          mapped_properties = {}
+            link_property_list.each do |link_property|
+              property_path = link_property.split(".")
+              result = find_property(property_path, scoped_properties)
+              if !result['found']
+                if default_properties.has_key?('properties') && default_properties['properties'].has_key?(link_property)
+                  if default_properties['properties'][link_property].has_key?('default')
+                    mapped_properties = update_mapped_properties(mapped_properties, property_path, default_properties['properties'][link_property]['default'])
+                  else
+                    mapped_properties = update_mapped_properties(mapped_properties, property_path, nil)
                   end
-                }
-              }
-            }
-          }
-          handle_faults(faults) unless faults.empty?
+                else
+                  e = Exception.new("Link property #{link_property} in template #{default_properties['template_name']} is not defined in release spec")
+                  errors.push(e)
+                end
+              else
+                mapped_properties = update_mapped_properties(mapped_properties, property_path, result['value'])
+              end
+            end
+          return mapped_properties
         end
 
-        def handle_faults(faults)
-          msg = "\n"
-          faults.each { |release_desc, packages_and_stemcells_list|
-            msg += "\nCan't deploy release `#{release_desc}'. It references packages (see below) without source code and are not compiled against intended stemcells:\n"
-            sorted_packages_and_stemcells = packages_and_stemcells_list.sort_by { |p| p[:package].name }
-            sorted_packages_and_stemcells.each { |item|
-              msg += " - `#{item[:package].name}/#{item[:package].version}' against `#{item[:stemcell].desc}'\n"
-            }
-          }
-          raise PackageMissingSourceCode, msg
+        def find_property(property_path, scoped_properties)
+          current_node = scoped_properties
+          property_path.each do |key|
+            if !current_node || !current_node.has_key?(key)
+              return {'found'=> false, 'value' => nil}
+            else
+              current_node = current_node[key]
+            end
+          end
+          return {'found'=> true,'value'=> current_node}
         end
 
-        def run_prepare_step(assembler)
-          @event_log.begin_stage('Preparing deployment', 9)
-          @logger.info('Preparing deployment')
-
-          track_and_log('Binding releases') do
-            assembler.bind_releases
+        def update_mapped_properties(mapped_properties, property_path, value)
+          current_node = mapped_properties
+          property_path.each_with_index do |key, index|
+            if index == property_path.size - 1
+              current_node[key] = value
+            else
+              if !current_node.has_key?(key)
+                current_node[key] = {}
+              end
+              current_node = current_node[key]
+            end
           end
-
-          track_and_log('Binding existing deployment') do
-            assembler.bind_existing_deployment
-          end
-
-          track_and_log('Binding resource pools') do
-            assembler.bind_resource_pools
-          end
-
-          track_and_log('Binding stemcells') do
-            assembler.bind_stemcells
-          end
-
-          track_and_log('Binding templates') do
-            assembler.bind_templates
-          end
-
-          track_and_log('Binding properties') do
-            assembler.bind_properties
-          end
-
-          track_and_log('Binding unallocated VMs') do
-            assembler.bind_unallocated_vms
-          end
-
-          track_and_log('Binding instance networks') do
-            assembler.bind_instance_networks
-          end
+          return mapped_properties
         end
 
-        def track_and_log(message)
-          @event_log.track(message) do
-            @logger.info(message)
-            yield
-          end
+        def validate_and_get_argument arg, type
+          raise "#{type} value should be integer or percent" unless arg =~/^\d+%$|\A[-+]?[0-9]+\z/ || arg == nil
+          arg
         end
       end
     end

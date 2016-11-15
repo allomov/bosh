@@ -6,14 +6,15 @@ module Bosh::Director
     let(:package_fingerprint) { 'fingerprint' }
     let(:stemcell_sha1) { 'sha1' }
     let(:blob_id) { 'blob_id' }
-    let(:stemcell) { instance_double('Bosh::Director::Models::Stemcell', sha1: stemcell_sha1) }
+    let(:stemcell) { instance_double('Bosh::Director::Models::Stemcell', sha1: stemcell_sha1, operating_system: 'chrome-os', version: 'latest') }
     let(:package) { instance_double('Bosh::Director::Models::Package', name: package_name, fingerprint: package_fingerprint) }
-    let(:compiled_package) { instance_double('Bosh::Director::Models::CompiledPackage', package: package, stemcell: stemcell, blobstore_id: blob_id) }
+    let(:compiled_package) { instance_double('Bosh::Director::Models::CompiledPackage', package: package, stemcell_os: stemcell.operating_system, stemcell_version: stemcell.version, blobstore_id: blob_id) }
     let(:dep_pkg2) { instance_double('Bosh::Director::Models::Package', fingerprint: 'dp_fingerprint2', version: '9.2-dev') }
     let(:dep_pkg1) { instance_double('Bosh::Director::Models::Package', fingerprint: 'dp_fingerprint1', version: '10.1-dev') }
     let(:compiled_package_cache_blobstore) { instance_double('Bosh::Blobstore::BaseClient') }
     let(:cache_key) { 'cache_sha1' }
     let(:dep_key) { '[]' }
+    let(:blobstore) { instance_double('Bosh::Blobstore::BaseClient') }
 
     before do
       allow(Config).to receive(:compiled_package_cache_blobstore).and_return(compiled_package_cache_blobstore)
@@ -59,7 +60,8 @@ module Bosh::Director
         expect(Models::CompiledPackage).to receive(:create) do |&block|
           cp = double
           expect(cp).to receive(:package=).with(package)
-          expect(cp).to receive(:stemcell=).with(stemcell)
+          expect(cp).to receive(:stemcell_os=).with(stemcell.operating_system)
+          expect(cp).to receive(:stemcell_version=).with(stemcell.version)
           expect(cp).to receive(:sha1=).with('cp sha1')
           expect(cp).to receive(:build=)
           expect(cp).to receive(:blobstore_id=).with(blob_id)
@@ -71,13 +73,25 @@ module Bosh::Director
         allow(App).to receive_message_chain(:instance, :blobstores, :blobstore).and_return(double('Bosh::Blobstore::Client', create: blob_id))
 
         allow(Digest::SHA1).to receive_message_chain(:file, :hexdigest).and_return('cp sha1')
-        allow(Models::CompiledPackage).to receive(:generate_build_number)
+        allow(Models::CompiledPackage).to receive(:generate_build_number).with(package, 'chrome-os', 'latest')
 
         expect(compiled_package_cache_blobstore).to receive(:get) do |sha, file|
           expect(sha).to eq('package_name-cache_sha1')
           expect(file.to_path).to match %r[/blob$]
         end
         expect(BlobUtil.fetch_from_global_cache(package, stemcell, cache_key, dep_key)).to eq(mock_compiled_package)
+      end
+    end
+
+    describe '#delete_blob' do
+      let(:fake_local_blobstore) { instance_double('Bosh::Blobstore::LocalClient') }
+      before do
+        allow(App).to receive_message_chain(:instance, :blobstores, :blobstore).and_return(fake_local_blobstore)
+      end
+
+      it 'deletes blob' do
+        expect(fake_local_blobstore).to receive(:delete).with('fake-blobstore-id')
+        expect{ BlobUtil.delete_blob('fake-blobstore-id') }.to_not raise_error
       end
     end
   end

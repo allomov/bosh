@@ -4,7 +4,7 @@ module Bosh::Cli
       extend Bosh::Cli::CommandDiscovery
       include Bosh::Cli::DeploymentHelper
 
-      attr_accessor :options, :out, :args
+      attr_accessor :options, :out, :args, :info
       attr_reader :work_dir, :exit_code, :runner
 
       DEFAULT_DIRECTOR_PORT = 25555
@@ -18,6 +18,7 @@ module Bosh::Cli
         @exit_code = 0
         @out = nil
         @args = []
+        @info = {}
       end
 
       # @return [Bosh::Cli::Config] Current configuration
@@ -87,6 +88,10 @@ module Bosh::Cli
         Bosh::Cli::Runner.new(args, @options).run
       end
 
+      def run_nested_command(*args)
+        Bosh::Cli::Runner.new(args, @options).run(false)
+      end
+
       def confirmed?(question = 'Are you sure?')
         return true if non_interactive?
         ask("#{question} (type 'yes' to continue): ") == 'yes'
@@ -116,7 +121,6 @@ module Bosh::Cli
         elsif username && password
           @credentials = Client::BasicCredentials.new(username, password)
         end
-
         @credentials
       end
 
@@ -140,7 +144,7 @@ module Bosh::Cli
 
     def auth_info
       @auth_info ||= begin
-        ca_cert = config.ca_cert(target)
+        ca_cert = options[:ca_cert] || config.ca_cert(target)
         director_client = Client::Director.new(target, nil, ca_cert: ca_cert)
         Client::Uaa::AuthInfo.new(director_client, ENV, ca_cert)
       end
@@ -204,7 +208,7 @@ module Bosh::Cli
 
     def no_track_unsupported
       if @options.delete(:no_track)
-        say('Ignoring `' + '--no-track'.make_yellow + "' option")
+        say("Ignoring '" + '--no-track'.make_yellow + "' option")
       end
     end
 
@@ -255,13 +259,6 @@ module Bosh::Cli
       end
     end
 
-    def valid_index_for(manifest_hash, job, index, options = {})
-      index = '0' if job_unique_in_deployment?(manifest_hash, job)
-      err('You should specify the job index. There is more than one instance of this job type.') if index.nil?
-      index = index.to_i if options[:integer_index]
-      index
-    end
-
     def normalize_url(url)
       url = url.gsub(/\/$/, '')
       url = "https://#{url}" unless url.match(/^http:?/)
@@ -279,7 +276,7 @@ module Bosh::Cli
         uri.port = DEFAULT_DIRECTOR_PORT
         uri.to_s
       end
+      end
     end
   end
-end
 end

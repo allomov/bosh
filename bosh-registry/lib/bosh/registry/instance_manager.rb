@@ -38,6 +38,15 @@ module Bosh::Registry
       get_instance(instance_id).destroy
     end
 
+    ##
+    # Get the list of IPs belonging to this instance
+    # @param [String] instance_id instance id
+    def instance_ips(instance_id)
+      raise NotImplemented, "Default implementation of InstanceManager does not support " \
+                            "IPs retrieval. Create IaaS-specific subclass and override this method " \
+                            "if IPs verfication is needed."
+    end
+
     private
 
     def check_instance_ips(ip, instance_id)
@@ -45,7 +54,7 @@ module Bosh::Registry
       actual_ips = instance_ips(instance_id)
       unless actual_ips.include?(ip)
         raise InstanceError, "Instance IP mismatch, expected IP is " \
-                             "`%s', actual IP(s): `%s'" %
+                             "'%s', actual IP(s): '%s'" %
                              [ ip, actual_ips.join(", ") ]
       end
     end
@@ -54,7 +63,7 @@ module Bosh::Registry
       instance = Models::RegistryInstance[:instance_id => instance_id]
 
       if instance.nil?
-        raise InstanceNotFound, "Can't find instance `#{instance_id}'"
+        raise InstanceNotFound, "Can't find instance '#{instance_id}'"
       end
 
       instance

@@ -77,20 +77,27 @@ module Bosh::Director
   ReleaseInvalidPackage = err(30012)
   ReleaseExistingJobFingerprintMismatch = err(30013)
   ReleaseVersionCommitHashMismatch = err(30014)
+  ReleaseSha1DoesNotMatch = err(30015)
+  ReleasePackageDependencyKeyMismatch = err(30016)
 
   ValidationInvalidType = err(40000)
   ValidationMissingField = err(40001)
   ValidationViolatedMin = err(40002)
   ValidationViolatedMax = err(40003)
+  ValidationExtraField = err(40004)
 
   StemcellInvalidArchive = err(50000)
   StemcellImageNotFound = err(50001)
   StemcellAlreadyExists = err(50002)
   StemcellNotFound = err(50003, NOT_FOUND)
   StemcellInUse = err(50004)
+  StemcellAliasAlreadyExists = err(50005)
+  StemcellBothNameAndOS = err(50006)
+  StemcellSha1DoesNotMatch = err(50007)
 
   PackageInvalidArchive = err(60000)
   PackageMissingSourceCode = err(60001)
+  CompiledPackageDeletionFailed = err(60002)
 
   # Models
   DeploymentNotFound = err(70000, NOT_FOUND)
@@ -115,11 +122,12 @@ module Bosh::Director
   JobTemplateBindingFailed = err(80006)
   JobTemplateUnpackFailed = err(80007)
   JobInvalidPropertySpec = err(80008)
-  JobInvalidPropertyMapping = err(80009)
+  InstanceGroupInvalidPropertyMapping = err(80009)
   JobIncompatibleSpecs = err(80010)
   JobPackageCollision = err(80011)
   JobInvalidPackageSpec = err(80012)
   JobInvalidLinkSpec = err(80013)
+  JobDuplicateLinkName = err(80014)
 
   ResourceError = err(100001)
   ResourceNotFound = err(100002, NOT_FOUND)
@@ -130,6 +138,11 @@ module Bosh::Director
   PropertyNotFound = err(110003, NOT_FOUND)
 
   CompilationConfigUnknownNetwork = err(120001)
+  CompilationConfigInvalidAvailabilityZone = err(120002)
+  CompilationConfigInvalidVmType = err(120003)
+  CompilationConfigCloudPropertiesNotAllowed = err(120004)
+  CompilationConfigInvalidVmExtension = err(120005)
+  CompilationConfigVmTypeRequired = err(120004)
 
   # Manifest parsing: network section
   NetworkReservationInvalidIp = err(130001)
@@ -142,55 +155,88 @@ module Bosh::Director
   NetworkReservationAlreadyInUse = err(130008)
   NetworkReservationWrongType = err(130009)
   NetworkReservationError = err(130010)
-  NetworkReservationNotEnoughCapacity = err(130010)
+  NetworkReservationNotEnoughCapacity = err(130011)
+  NetworkReservationIpOutsideSubnet = err(130012)
+  NetworkReservationIpReserved = err(130013)
 
   # Manifest parsing: job section
-  JobMissingRelease = err(140001)
-  JobUnknownRelease = err(140002)
-  JobUnknownResourcePool = err(140003)
-  JobInvalidInstanceIndex = err(140004)
-  JobInvalidInstanceState = err(140005)
-  JobInvalidJobState = err(140006)
-  JobMissingNetwork = err(140007)
-  JobInvalidTemplates = err(140008)
-  JobInvalidLifecycle = err(140009)
-  JobUnknownDiskPool = err(140010)
-  JobInvalidPersistentDisk = err(140011)
+  InstanceGroupMissingRelease = err(140001)
+  InstanceGroupUnknownRelease = err(140002)
+  InstanceGroupUnknownResourcePool = err(140003)
+  InstanceGroupUnknownVmType = err(140004)
+  InstanceGroupUnknownStemcell = err(140005)
+  JobInvalidInstanceIndex = err(140006)
+  InstanceGroupInvalidInstanceState = err(140007)
+  InstanceGroupInvalidState = err(140008)
+  JobMissingNetwork = err(140009)
+  InstanceGroupInvalidTemplates = err(140010)
+  JobInvalidLifecycle = err(140011)
+  InstanceGroupUnknownDiskType = err(140012)
+  InstanceGroupInvalidPersistentDisk = err(140013)
+  JobMissingLink = err(140014)
+  UnusedProvidedLink = err(140015)
+  JobInvalidAvailabilityZone = err(140016)
+  JobMissingAvailabilityZones = err(140017)
+  JobUnknownAvailabilityZone = err(140018)
+  InstanceGroupAmbiguousEnv = err(140019)
+  JobBothInstanceGroupAndJob = err(140020)
+  JobInstanceIgnored = err(140021)
 
   # Manifest parsing: job networks section
   JobUnknownNetwork = err(150001)
-  JobNetworkInstanceIpMismatch = err(150002)
+  InstanceGroupNetworkInstanceIpMismatch = err(150002)
   JobNetworkInvalidDefault = err(150003)
   JobNetworkMultipleDefaults = err(150004)
   JobNetworkMissingDefault = err(150005)
+  JobNetworkMissingRequiredAvailabilityZone= err(150006)
+  JobStaticIpsFromInvalidAvailabilityZone= err(150007)
+  JobStaticIPNotSupportedOnDynamicNetwork= err(150008)
+  JobInvalidStaticIPs = err(150009)
 
+  #Network
   NetworkOverlappingSubnets = err(160001)
   NetworkInvalidRange = err(160002)
   NetworkInvalidGateway = err(160003)
   NetworkInvalidDns = err(160004)
   NetworkReservedIpOutOfRange = err(160005)
   NetworkStaticIpOutOfRange = err(160006)
+  NetworkSubnetUnknownAvailabilityZone = err(160007)
+  NetworkInvalidProperty = err(160008)
+  NetworkSubnetInvalidAvailabilityZone = err(160009)
+  NetworkInvalidIpRangeFormat = err(160010)
 
+  # ResourcePool
   ResourcePoolUnknownNetwork = err(170001)
   ResourcePoolNotEnoughCapacity = err(170002)
 
+  # UpdateConfig
   UpdateConfigInvalidWatchTime = err(180001)
 
+  # Deployment
   DeploymentAmbiguousReleaseSpec = err(190001)
   DeploymentDuplicateReleaseName = err(190002)
   DeploymentDuplicateResourcePoolName = err(190003)
-  DeploymentRenamedJobNameStillUsed = err(190004)
-  DeploymentCanonicalJobNameTaken = err(190005)
-  DeploymentCanonicalNetworkNameTaken = err(190006)
-  DeploymentNoNetworks = err(190007)
-  DeploymentCanonicalNameTaken = err(190008)
-  DeploymentInvalidNetworkType = err(190009)
-  DeploymentUnknownTemplate = err(190012)
-  DeploymentDuplicateDiskPoolName = err(190013)
+  DeploymentDuplicateVmTypeName = err(190004)
+  DeploymentDuplicateVmExtensionName = err(190005)
+  DeploymentCanonicalJobNameTaken = err(190006)
+  DeploymentCanonicalNetworkNameTaken = err(190007)
+  DeploymentNoNetworks = err(190008)
+  DeploymentCanonicalNameTaken = err(190009)
+  DeploymentInvalidNetworkType = err(190010)
+  DeploymentUnknownTemplate = err(190011)
+  DeploymentInvalidDiskSpecification = err(190012)
+  DeploymentDuplicateDiskTypeName = err(190013)
   DeploymentInvalidProperty = err(190014)
   DeploymentNoResourcePools = err(190015)
+  DeploymentInvalidLink = err(190016)
+  DeploymentDuplicateAvailabilityZoneName = err(190017)
+  DeploymentInvalidMigratedFromJob = err(190018)
+  DeploymentInvalidResourceSpecification = err(190019)
+  DeploymentIgnoredInstancesModification = err(190020)
+  DeploymentIgnoredInstancesDeletion = err(190021)
 
-  DiskPoolInvalidDiskSize = err(200001)
+  # DiskType
+  DiskTypeInvalidDiskSize = err(200001)
 
   CloudDiskNotAttached = err(390001)
   CloudDiskMissing = err(390002)
@@ -214,14 +260,16 @@ module Bosh::Director
   CloudcheckResolutionNotProvided = err(410002)
   CloudcheckInvalidResolutionFormat = err(410003)
 
+  # DNS
   DnsInvalidCanonicalName = err(420001)
 
-  PackageCompilationNetworkNotReserved = err(430001)
+  # PackageCompilation
   PackageCompilationNotEnoughWorkersForReuse = err(430002)
   PackageCompilationNotFound = err(430003)
 
   BadManifest = err(440001)
 
+  # RPC
   RpcRemoteException = err(450001)
   RpcTimeout = err(450002)
 
@@ -230,4 +278,33 @@ module Bosh::Director
 
   # Run errand errors
   RunErrandError = err(510000)
+
+  # Disk errors
+  DeletingPersistentDiskError = err(520000)
+  AttachDiskErrorUnknownInstance = err(520001)
+  AttachDiskNoPersistentDisk =  err(520002)
+  AttachDiskInvalidInstanceState = err(520003)
+
+  # Addons
+  RuntimeAmbiguousReleaseSpec = err(530000)
+  RuntimeInvalidReleaseVersion = err(530001)
+  RuntimeReleaseNotListedInReleases = err(530002)
+  RuntimeInvalidDeploymentRelease = err(530003)
+  RuntimeIncompleteIncludeJobSection = err(530004)
+  RuntimeIncompleteIncludeStemcellSection = err(530005)
+
+  # Config server errors
+  ConfigServerMissingNames = err(540000)
+  ConfigServerSSLError = err(540001)
+  ConfigServerPasswordGenerationError = err(540002)
+  ConfigServerUnknownError = err(540003)
+  ConfigServerCertificateGenerationError = err(540004)
+  ConfigServerIncorrectNameSyntax = err(540005)
+
+  # Authorization errors
+  UnauthorizedToAccessDeployment = err(600000, UNAUTHORIZED)
+
+  # UAA
+  UAAAuthorizationError = err(610000)
+
 end

@@ -48,12 +48,11 @@ module Bosh::Clouds
     def current_vm_id(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
     def create_stemcell(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
     def delete_stemcell(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
-    def create_vm(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
+    def create_vm(*arguments) invoke_cpi_method(__method__.to_s, *arguments); end
     def delete_vm(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
     def has_vm?(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
     def reboot_vm(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
     def set_vm_metadata(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
-    def configure_networks(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
     def create_disk(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
     def has_disk?(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
     def delete_disk(*arguments); invoke_cpi_method(__method__.to_s, *arguments); end
@@ -86,26 +85,27 @@ module Bosh::Clouds
       validate_response(parsed_response)
 
       if parsed_response['error']
-        handle_error(parsed_response['error'])
+        handle_error(parsed_response['error'], method_name)
       end
 
       save_cpi_log(parsed_response['log'])
+      save_cpi_log(stderr)
 
       parsed_response['result']
     end
 
     def checked_cpi_exec_path
       unless File.executable?(@cpi_path)
-        raise NonExecutable, "Failed to run cpi: `#{@cpi_path}' is not executable"
+        raise NonExecutable, "Failed to run cpi: '#{@cpi_path}' is not executable"
       end
       @cpi_path
     end
 
-    def handle_error(error_response)
+    def handle_error(error_response, method_name)
       error_type = error_response['type']
       error_message = error_response['message']
       unless KNOWN_RPC_ERRORS.include?(error_type)
-        raise UnknownError, "Unknown CPI error '#{error_type}' with message '#{error_message}'"
+        raise UnknownError, "Unknown CPI error '#{error_type}' with message '#{error_message}' in '#{method_name}' CPI method"
       end
 
       error_class = constantize(error_type)
@@ -116,7 +116,7 @@ module Bosh::Clouds
         error = error_class.new(error_message)
       end
 
-      raise error, error_message
+      raise error, "CPI error '#{error_type}' with message '#{error_message}' in '#{method_name}' CPI method"
     end
 
     def save_cpi_log(output)

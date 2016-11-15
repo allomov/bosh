@@ -10,7 +10,6 @@ module Bosh::Stemcell
         env: env,
         definition: definition,
         version: '007',
-        release_tarball: 'fake/release.tgz',
         os_image_tarball: 'fake/os_image.tgz',
       }
     end
@@ -67,9 +66,6 @@ module Bosh::Stemcell
           end
 
           it 'sets default values for options based in hash' do
-            expected_release_micro_manifest_path =
-              File.join(expected_source_root, "release/micro/#{infrastructure.name}.yml")
-
             result = stemcell_builder_options.default
 
             expect(result['stemcell_operating_system']).to eq(operating_system.name)
@@ -78,19 +74,10 @@ module Bosh::Stemcell
             expect(result['UBUNTU_ISO']).to eq('fake_ubuntu_iso')
             expect(result['UBUNTU_MIRROR']).to eq('fake_ubuntu_mirror')
             expect(result['ruby_bin']).to eq('fake_ruby_bin')
-            expect(result['bosh_release_src_dir']).to eq(File.join(expected_source_root, '/release/src/bosh'))
             expect(result['agent_src_dir']).to eq(
               File.join(expected_source_root, 'go/src/github.com/cloudfoundry/bosh-agent')
             )
-            expect(result['davcli_src_dir']).to eq(
-              File.join(expected_source_root, 'go/src/github.com/cloudfoundry/bosh-davcli')
-            )
             expect(result['image_create_disk_size']).to eq(default_disk_size)
-            expect(result['bosh_micro_enabled']).to eq('yes')
-            expect(result['bosh_micro_package_compiler_path']).to eq(
-              File.join(expected_source_root, 'bosh-release'))
-            expect(result['bosh_micro_manifest_yml_path']).to eq(expected_release_micro_manifest_path)
-            expect(result['bosh_micro_release_tgz_path']).to eq('fake/release.tgz')
             expect(result['os_image_tgz']).to eq('fake/os_image.tgz')
           end
 
@@ -133,6 +120,17 @@ module Bosh::Stemcell
       describe 'infrastructure variation' do
         context 'when infrastruture is aws' do
           let(:infrastructure) { Infrastructure.for('aws') }
+          let(:default_disk_size) { 3072 }
+
+          it_sets_correct_environment_variables
+
+          it 'has no "image_ovftool_path" key' do
+            expect(stemcell_builder_options.default).not_to have_key('image_ovftool_path')
+          end
+        end
+
+        context 'when infrastruture is google' do
+          let(:infrastructure) { Infrastructure.for('google') }
           let(:default_disk_size) { 3072 }
 
           it_sets_correct_environment_variables
@@ -190,6 +188,17 @@ module Bosh::Stemcell
 
         context 'when infrastructure is openstack' do
           let(:infrastructure) { Infrastructure.for('openstack') }
+          let(:default_disk_size) { 3072 }
+
+          it_sets_correct_environment_variables
+
+          it 'has no "image_ovftool_path" key' do
+            expect(stemcell_builder_options.default).not_to have_key('image_ovftool_path')
+          end
+        end
+
+        context 'when infrastruture is azure' do
+          let(:infrastructure) { Infrastructure.for('azure') }
           let(:default_disk_size) { 3072 }
 
           it_sets_correct_environment_variables

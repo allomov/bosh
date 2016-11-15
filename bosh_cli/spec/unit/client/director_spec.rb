@@ -4,7 +4,6 @@ describe Bosh::Cli::Client::Director do
   DUMMY_TARGET = 'https://target.example.com:8080'
 
   before do
-    allow(Resolv).to receive(:getaddresses).with('target.example.com').and_return(['127.0.0.1'])
     @director = Bosh::Cli::Client::Director.new(DUMMY_TARGET, credentials)
     allow(@director).to receive(:retry_wait_interval).and_return(0)
   end
@@ -120,7 +119,7 @@ describe Bosh::Cli::Client::Director do
       let(:request_headers) { { 'Content-Type' => 'application/json', 'Authorization' => 'Basic dXNlcjpwYXNz' } }
 
       it 'adds authorization header with basic auth' do
-        stub_request(:get, 'https://127.0.0.1:8080/info').
+        stub_request(:get, 'https://target.example.com:8080/info').
           with(headers: request_headers).to_return(body: '{}', status: 200)
 
         @director.get_status
@@ -133,10 +132,47 @@ describe Bosh::Cli::Client::Director do
       let(:request_headers) { { 'Content-Type' => 'application/json', 'Authorization' => 'bearer token' } }
 
       it 'adds authorization header with UAA token' do
-        stub_request(:get, 'https://127.0.0.1:8080/info').
+        stub_request(:get, 'https://target.example.com:8080/info').
           with(headers: request_headers).to_return(body: '{}', status: 200)
 
         @director.get_status
+      end
+
+      context 'when server gives 401' do
+        let(:token_provider) {
+          token_provider = instance_double(Bosh::Cli::Client::Uaa::TokenProvider)
+          expect(token_provider).to receive(:token).and_return('bearer token')
+          expect(token_provider).to receive(:token).and_return('bearer new-token')
+          expect(token_provider).to receive(:refresh)
+          token_provider
+        }
+        let(:new_token_request_headers) { { 'Content-Type' => 'application/json', 'Authorization' => 'bearer new-token' } }
+
+        it 'attempts to refresh token' do
+          stub_request(:get, 'https://target.example.com:8080/info').
+              with(headers: request_headers).
+              to_return(body: '', status: 401)
+
+          stub_request(:get, 'https://target.example.com:8080/info').
+              with(headers: new_token_request_headers).
+              to_return(body: '{"version":258}', status: 200)
+
+          status = @director.get_status
+          expect(status['version']).to eq(258)
+        end
+
+        context 'when no credentials are specified' do
+          let(:credentials) { nil }
+
+          it 'should not attempt to refresh the token and raise an error' do
+            stub_request(:get, 'https://target.example.com:8080/info').
+              to_return(body: '', status: 401)
+
+            expect {
+              @director.get_status
+            }.to raise_error(Bosh::Cli::AuthError)
+          end
+        end
       end
     end
 
@@ -145,10 +181,63 @@ describe Bosh::Cli::Client::Director do
       let(:request_headers) { { 'Content-Type' => 'application/json' } }
 
       it 'adds authorization header with UAA token' do
-        stub_request(:get, 'https://127.0.0.1:8080/info').
+        stub_request(:get, 'https://target.example.com:8080/info').
           with(headers: request_headers).to_return(body: '{}', status: 200)
 
         @director.get_status
+      end
+    end
+
+    context 'performing a http post with a request body' do
+      context 'without a token credential' do
+        let(:credentials) { nil }
+
+        it 'should not refresh the token before making a request with a body' do
+          stub_request(:post, 'https://target.example.com:8080/path').
+            with(headers: { 'Content-Type' => 'application/json' }).
+            to_return(body: '{"version":258}', status: 401)
+
+          expect { @director.post('/path', 'application/json', 'binary data') }.to raise_error(Bosh::Cli::DirectorError, /HTTP 401/)
+        end
+      end
+
+      context 'using token credentials' do
+        let(:token_provider) {
+          token_provider = instance_double(Bosh::Cli::Client::Uaa::TokenProvider)
+          allow(token_provider).to receive(:token).and_return('bearer token')
+          token_provider
+        }
+        let(:credentials) { Bosh::Cli::Client::UaaCredentials.new(token_provider) }
+
+        it 'should refresh the token before making a request with a body' do
+          stub_request(:post, 'https://target.example.com:8080/path').
+              with(headers: { 'Content-Type' => 'application/json', 'Authorization' => 'bearer token' }).
+              to_return(body: '{"version":258}', status: 200)
+
+          expect(credentials).to receive(:refresh)
+
+          @director.post('/path', 'application/json', 'binary data')
+        end
+
+        it 'should not refresh the token if the initial request returns a 401' do
+          stub_request(:post, 'https://target.example.com:8080/path').
+            with(headers: { 'Content-Type' => 'application/json', 'Authorization' => 'bearer token' }).
+            to_return(body: '{"version":258}', status: 401)
+
+          expect(credentials).to receive(:refresh).once
+
+          expect {@director.post('/path', 'application/json', 'binary data')}.to raise_error(Bosh::Cli::DirectorError, /HTTP 401/)
+        end
+
+        it 'should not refresh the token before making a request without a body' do
+          stub_request(:get, 'https://target.example.com:8080/path').
+              with(headers: { 'Content-Type' => 'application/json', 'Authorization' => 'bearer token' }).
+              to_return(body: '{"version":258}', status: 200)
+
+          expect(credentials).to_not receive(:refresh)
+
+          @director.get('/path', 'application/json')
+        end
       end
     end
   end
@@ -189,7 +278,7 @@ describe Bosh::Cli::Client::Director do
       let(:response_body) { JSON.generate(vms) }
 
       before do
-        stub_request(:get, 'https://127.0.0.1:8080/deployments/foo/vms').
+        stub_request(:get, 'https://target.example.com:8080/deployments/foo/vms').
           with(headers: request_headers).to_return(body: response_body, status: 200)
       end
 
@@ -199,6 +288,44 @@ describe Bosh::Cli::Client::Director do
         it 'lists vms for a given deployment' do
           expect(@director.list_vms('foo')).to eq vms
         end
+      end
+    end
+
+    describe '#list_events' do
+      it 'can list events before a given id' do
+        expect(@director).to receive(:get).with('/events?before_id=4', 'application/json')
+                               .and_return([200, JSON.generate([]), {}])
+        @director.list_events({before_id: 4})
+      end
+
+      it 'can list all events' do
+        expect(@director).to receive(:get).with('/events', 'application/json')
+                               .and_return([200, JSON.generate([]), {}])
+        @director.list_events
+      end
+
+      it 'can list events with a given deployment' do
+        expect(@director).to receive(:get).with('/events?deployment=name', 'application/json')
+                               .and_return([200, JSON.generate([]), {}])
+        @director.list_events({deployment: 'name'})
+      end
+
+      it 'can list events with a given task' do
+        expect(@director).to receive(:get).with('/events?task=5', 'application/json')
+                               .and_return([200, JSON.generate([]), {}])
+        @director.list_events({task: '5'})
+      end
+
+      it 'can list events with a given instance id' do
+        expect(@director).to receive(:get).with('/events?instance=job/5', 'application/json')
+                               .and_return([200, JSON.generate([]), {}])
+        @director.list_events({instance: 'job/5'})
+      end
+
+      it 'can filter by multiple parameters' do
+        expect(@director).to receive(:get).with('/events?before_id=4&deployment=name&instance=job/5&task=6', 'application/json')
+                               .and_return([200, JSON.generate([]), {}])
+        @director.list_events({instance: 'job/5', deployment: 'name', task: 6, before_id: 4})
       end
     end
 
@@ -266,6 +393,32 @@ describe Bosh::Cli::Client::Director do
       @director.list_stemcells
     end
 
+    it 'retrieves latest cloud config' do
+      expect(@director).to receive(:get).with('/cloud_configs?limit=1', 'application/json').
+          and_return([200, JSON.generate([]), {}])
+      @director.get_cloud_config
+    end
+
+    it 'updates cloud config' do
+      expect(@director).to receive(:post).
+          with('/cloud_configs', 'text/yaml', 'cloud config manifest').
+          and_return(true)
+      @director.update_cloud_config('cloud config manifest')
+    end
+
+    it 'retrieves latest runtime config' do
+      expect(@director).to receive(:get).with('/runtime_configs?limit=1', 'application/json').
+          and_return([200, JSON.generate([]), {}])
+      @director.get_runtime_config
+    end
+
+    it 'updates runtime config' do
+      expect(@director).to receive(:post).
+          with('/runtime_configs', 'text/yaml', 'runtime config manifest').
+          and_return(true)
+      @director.update_runtime_config('runtime config manifest')
+    end
+
     it 'lists releases' do
       expect(@director).to receive(:get).with('/releases', 'application/json').
         and_return([200, JSON.generate([]), {}])
@@ -296,6 +449,12 @@ describe Bosh::Cli::Client::Director do
              'application/json').
         and_return([200, JSON.generate([]), {}])
       @director.list_running_tasks
+
+      expect(@director).to receive(:get).
+          with('/tasks?state=processing,cancelling,queued&verbose=1&deployment=deployment-name',
+               'application/json').
+          and_return([200, JSON.generate([]), {}])
+      @director.list_running_tasks(1, 'deployment-name')
     end
 
     it 'lists recent tasks' do
@@ -313,6 +472,11 @@ describe Bosh::Cli::Client::Director do
         with('/tasks?limit=50&verbose=2', 'application/json').
         and_return([200, JSON.generate([]), {}])
       @director.list_recent_tasks(50, 2)
+
+      expect(@director).to receive(:get).
+          with('/tasks?limit=50&verbose=2&deployment=deployment-name', 'application/json').
+          and_return([200, JSON.generate([]), {}])
+      @director.list_recent_tasks(50, 2, 'deployment-name')
     end
 
     it 'uploads local release' do
@@ -342,11 +506,11 @@ describe Bosh::Cli::Client::Director do
 
     it 'uploads remote release (with options)' do
       expect(@director).to receive(:request_and_track).
-        with(:post, '/releases?rebase=true&skip_if_exists=true', hash_including(
+        with(:post, '/releases?rebase=true&skip_if_exists=true&sha1=abcd1234', hash_including(
                :content_type => 'application/json',
                :payload      => JSON.generate('location' => 'release_uri'))).
         and_return(true)
-      @director.upload_remote_release('release_uri', rebase: true, skip_if_exists: true)
+      @director.upload_remote_release('release_uri', rebase: true, skip_if_exists: true, sha1: 'abcd1234')
     end
 
     it 'gets release info' do
@@ -393,14 +557,6 @@ describe Bosh::Cli::Client::Director do
       @director.delete_release('zb', :force => true)
     end
 
-    it 'deploys' do
-      expect(@director).to receive(:request_and_track).
-        with(:post, '/deployments',
-             { :content_type => 'text/yaml', :payload => 'manifest' }).
-        and_return(true)
-      @director.deploy('manifest')
-    end
-
     it 'changes job state' do
       expect(@director).to receive(:request_and_track).
         with(:put, '/deployments/foo/jobs/dea?state=stopped',
@@ -409,12 +565,59 @@ describe Bosh::Cli::Client::Director do
       @director.change_job_state('foo', 'manifest', 'dea', nil, 'stopped')
     end
 
+    it 'attaches a disk to an instance' do
+      expect(@director).to receive(:request_and_track).
+        with(:put, '/disks/vol-af4a3e40/attachments?deployment=foo&job=dea&instance_id=17f01a35').
+        and_return(true)
+      @director.attach_disk('foo', 'dea', '17f01a35', 'vol-af4a3e40')
+    end
+
     it 'changes job instance state' do
       expect(@director).to receive(:request_and_track).
         with(:put, '/deployments/foo/jobs/dea/0?state=detached',
              { :content_type => 'text/yaml', :payload => 'manifest' }).
         and_return(true)
       @director.change_job_state('foo', 'manifest', 'dea', 0, 'detached')
+    end
+
+    context 'max_in_flight provided' do
+      it 'passes it to director' do
+        expect(@director).to receive(:request_and_track).
+          with(:put, '/deployments/foo/jobs/dea/0?state=detached&max_in_flight=77',
+            { :content_type => 'text/yaml', :payload => 'manifest' }).
+          and_return(true)
+        @director.change_job_state('foo', 'manifest', 'dea', 0, 'detached', max_in_flight: 77)
+      end
+    end
+
+    describe '#deploy' do
+      it "hits director's 'deployment' endpoint"  do
+        expect(@director).to receive(:request_and_track).
+          with(:post, '/deployments',
+            { :content_type => 'text/yaml', :payload => 'manifest' }).
+          and_return(true)
+        @director.deploy('manifest')
+      end
+
+      context 'with dry-run' do
+        it 'passes in a query param to the deployments API' do
+          expect(@director).to receive(:request_and_track).
+            with(:post, '/deployments?dry_run=true',
+              { :content_type => 'text/yaml', :payload => 'manifest' }).
+            and_return(true)
+          @director.deploy('manifest', {:dry_run => true})
+        end
+      end
+    end
+
+    context 'canaries provided' do
+      it 'passes it to director' do
+        expect(@director).to receive(:request_and_track).
+          with(:put, '/deployments/foo/jobs/dea/0?state=detached&canaries=77',
+            { :content_type => 'text/yaml', :payload => 'manifest' }).
+          and_return(true)
+        @director.change_job_state('foo', 'manifest', 'dea', 0, 'detached', canaries: 77)
+      end
     end
 
     it 'changes job instance resurrection state' do
@@ -435,6 +638,16 @@ describe Bosh::Cli::Client::Director do
           {},
           {})
       @director.change_vm_resurrection_for_all(false)
+    end
+
+    it 'changes instance ignore state' do
+      expect(@director).to receive(:request).with(:put,
+          '/deployments/foo/instance_groups/dea/90FDC5D7-AB28-44EF-BFE0-E6AEE88BCBCA/ignore',
+          'application/json',
+          '{"ignore":true}',
+          {},
+          {})
+      @director.change_instance_ignore_state('foo', 'dea', '90FDC5D7-AB28-44EF-BFE0-E6AEE88BCBCA', true)
     end
 
     it 'gets task state' do
@@ -517,13 +730,73 @@ describe Bosh::Cli::Client::Director do
       @director.delete_snapshot('foo', 'snap0a')
     end
 
+    it 'deletes vm' do
+      expect(@director).to receive(:request_and_track).
+          with(:delete, '/vms/vm_cid').and_return(true)
+      @director.delete_vm_by_cid('vm_cid')
+    end
+
+    describe '#diff_deployment' do
+
+      let(:request_headers) { { 'Authorization' => 'Basic dXNlcjpwYXNz' } }
+
+      let(:manifest) do
+        <<-MANIFEST
+---
+name: test
+releases:
+- name: simple
+  version: 2
+resource_pools:
+- name: rp
+  stemcell:
+    name: ubuntu
+    version: 1
+networks:
+- name: default
+jobs:
+- name: job1
+  template: xyz
+  networks:
+  - name: default
+- name: old_job
+  template: xyz
+  networks:
+  - name: default
+        MANIFEST
+      end
+
+      context 'redacting' do
+        it 'does not pass redact=false parameter' do
+          stub_request(:post, 'https://target.example.com:8080/deployments/foo/diff').
+            with(headers: request_headers).
+            to_return(status: 200, body: '{}')
+          expect(@director).to receive(:post).with('/deployments/foo/diff', 'text/yaml', manifest)
+                                 .and_return([200, '{}'])
+          @director.diff_deployment('foo', manifest)
+        end
+      end
+
+      context 'not redacting' do
+        it 'passes redact=false parameter' do
+          stub_request(:post, 'https://target.example.com:8080/deployments/foo/diff?redact=false').
+            with(headers: request_headers).
+            to_return(status: 200, body: '{}')
+          expect(@director).to receive(:post).with('/deployments/foo/diff?redact=false', 'text/yaml', manifest)
+                                 .and_return([200, '{}'])
+          @director.diff_deployment('foo', manifest, false)
+        end
+      end
+    end
+
     it 'ssh setup' do
       payload = {
           'command'         => 'setup',
           'deployment_name' => 'foo',
           'target'          => {
               'job'     => 'bar',
-              'indexes' => [0]
+              'indexes' => ['fake-id'],
+              'ids' => ['fake-id']
           },
           'params'          => {
               'user'       => 'user',
@@ -537,7 +810,7 @@ describe Bosh::Cli::Client::Director do
                                                               :content_type => 'application/json'})
                                .and_return([200, JSON.generate([]), {}])
 
-      @director.setup_ssh('foo', 'bar', 0, 'user', 'public_key', 'password')
+      @director.setup_ssh('foo', 'bar', 'fake-id', 'user', 'public_key', 'password')
     end
 
     it 'ssh cleanup' do
@@ -547,7 +820,8 @@ describe Bosh::Cli::Client::Director do
           'deployment_name' => 'foo',
           'target'          => {
               'job'     => 'bar',
-              'indexes' => [0]
+              'indexes' => ['fake-id'],
+              'ids' => ['fake-id']
           },
           'params'          => { 'user_regex' => 'bosh_' }
       }
@@ -559,19 +833,19 @@ describe Bosh::Cli::Client::Director do
                                                             )
                                .and_return([200, JSON.generate([]), {}])
 
-      @director.cleanup_ssh('foo', 'bar', 'bosh_', [0])
+      @director.cleanup_ssh('foo', 'bar', 'bosh_', ['fake-id'])
     end
 
     context 'when director returns 404' do
       let(:request_headers) { { 'Authorization' => 'Basic dXNlcjpwYXNz' } }
       before do
-        stub_request(:get, 'https://127.0.0.1:8080/bad_endpoint').
+        stub_request(:get, 'https://target.example.com:8080/bad_endpoint').
           with(headers: request_headers).to_return(body: 'Not Found', status: 404)
       end
       let(:target_name) { 'FAKE-DIRECTOR' }
       before do
         status_response = { name: target_name }
-        stub_request(:get, 'https://127.0.0.1:8080/info').
+        stub_request(:get, 'https://target.example.com:8080/info').
           with(headers: request_headers).
           to_return(body: JSON.generate(status_response), status: 200)
       end
@@ -604,6 +878,30 @@ describe Bosh::Cli::Client::Director do
         with(:delete, '/releases/fake-release-name?version=1%2Bdev.1', {}).and_return(true)
       @director.delete_release('fake-release-name', version: '1+dev.1')
     end
+
+    it 'uploads the database dump file to restore database' do
+      expect(@director).to receive(:upload_without_track).
+                               with('/restore', '/path',
+                                    { :content_type => 'application/x-compressed' }).
+                               and_return(true)
+      @director.restore_db('/path')
+    end
+
+    describe 'check_director_restart' do
+      it 'wait until the director is restarted successfully' do
+        expect(@director).to receive(:get).
+                                with('/info', 'application/json').twice.
+                                and_return([100, '{}'], [200, '{}'])
+        expect(@director.check_director_restart(1, 10)).to eql(true)
+      end
+
+      it 'reports timeout if the director can not be restarted in time' do
+        expect(@director).to receive(:get).
+                                 with('/info', 'application/json').at_least(:once).
+                                 and_return([200, '{}'])
+        expect(@director.check_director_restart(1, 1)).to eql(false)
+      end
+    end
   end
 
   describe 'create_backup' do
@@ -620,6 +918,32 @@ describe Bosh::Cli::Client::Director do
       expect(@director).to receive(:get).with('/backups', nil, nil, {}, :file => true)
       .and_return([200, '/some/path', {}])
       expect(@director.fetch_backup).to eq('/some/path')
+    end
+  end
+
+  describe 'fetch_vm_state' do
+    let(:dummy_deployment_name) {"dummy_deployment"}
+    let(:dummy_vm_state) do
+      JSON.generate [{"agent_id" => "some-agent-id", "index" => "0", "job" => "dummy_deployment_job"}]
+    end
+
+    it 'fetches full vm state with a task by default' do
+      expect(@director).to receive(:request_and_track).
+          with(:get, "/deployments/#{dummy_deployment_name}/vms?format=full", {}).
+          and_return([:done, 14])
+
+      expect(@director).to receive(:get_task_result_log).with(14).
+          and_return(dummy_vm_state)
+
+      expect(@director.fetch_vm_state(dummy_deployment_name)).to eq(JSON.parse dummy_vm_state)
+    end
+
+    it 'fetches short form vm state without a task if full = false' do
+      expect(@director).to receive(:get).
+          with("/deployments/#{dummy_deployment_name}/vms", nil, nil, {}, {}).
+          and_return([200, "[#{dummy_vm_state}]", nil])
+
+      expect(@director.fetch_vm_state(dummy_deployment_name, {}, false)).to eq(JSON.parse dummy_vm_state)
     end
   end
 
@@ -695,7 +1019,6 @@ describe Bosh::Cli::Client::Director do
         options = { :arg1 => 1, :arg2 => 2 }
 
         expect(URI).to receive(:parse).with(DUMMY_TARGET).and_call_original
-        expect(Resolv).to receive(:getaddresses).with('target.example.com').and_return(['127.0.0.1'])
         @director = Bosh::Cli::Client::Director.new(DUMMY_TARGET, credentials, :no_track => true)
 
         expect(@director).to receive(:request).
@@ -778,10 +1101,10 @@ describe Bosh::Cli::Client::Director do
       allow(HTTPClient).to receive(:new).and_return(client)
 
       expect(client).to receive(:request).
-        with(:get, 'http:///127.0.0.1:8080/stuff', :body => 'payload',
+        with(:get, 'http:///target.example.com:8080/stuff', :body => 'payload',
              :header                                     => headers.merge('Authorization' => auth))
       @director.send(:perform_http_request, :get,
-                     'http:///127.0.0.1:8080/stuff', 'payload', headers)
+                     'http:///target.example.com:8080/stuff', 'payload', headers)
     end
   end
 
@@ -791,7 +1114,7 @@ describe Bosh::Cli::Client::Director do
                              :body             => 'test', :headers => {})
 
       expect(@director).to receive(:perform_http_request).
-        with(:get, 'https://127.0.0.1:8080/stuff', 'payload', 'h1' => 'a',
+        with(:get, 'https://target.example.com:8080/stuff', 'payload', 'h1' => 'a',
              'h2'                                                  => 'b',
              'Content-Type' => 'app/zb', 'Host'=>'target.example.com').
         and_return(mock_response)

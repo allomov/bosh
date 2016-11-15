@@ -19,8 +19,7 @@ module Bosh::Director
         and_return(event_logger)
     end
 
-    let(:cloud) { instance_double('Bosh::Cloud') }
-    before { allow(Config).to receive(:cloud).and_return(cloud) }
+    let(:cloud) { Config.cloud }
 
     describe 'reset' do
       it 'should mark all open problems as closed' do
@@ -44,12 +43,12 @@ module Bosh::Director
                                                     type: 'inactive_disk',
                                                     deployment: deployment,
                                                     state: 'open',
-                                                    resource_id: instance1.vm.id)
+                                                    resource_id: instance1.id)
           problem2 = Models::DeploymentProblem.make(counter: 1,
                                                     type: 'inactive_disk',
                                                     deployment: deployment,
                                                     state: 'open',
-                                                    resource_id: instance2.vm.id)
+                                                    resource_id: instance2.id)
           scanner.reset([['job1', 0]])
           expect(Models::DeploymentProblem[problem1.id].state).to eq('closed')
           expect(Models::DeploymentProblem[problem2.id].state).to eq('open')

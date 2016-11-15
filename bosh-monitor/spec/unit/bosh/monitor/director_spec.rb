@@ -49,13 +49,13 @@ describe 'Bhm::Director' do
       end
     end
 
-    it 'can fetch deployment by name from BOSH director' do
-      stub_request(:get, 'http://localhost:8080/director/deployments/foo/vms').
+    it 'can fetch instances by deployment name from BOSH director' do
+      stub_request(:get, 'http://localhost:8080/director/deployments/foo/instances').
         with(:headers => {'Authorization' => ['admin', 'admin']}).
         to_return(:body => json_dump(deployments), :status => 200)
 
       with_fiber do
-        expect(director.get_deployment_vms('foo')).to eq(deployments)
+        expect(director.get_deployment_instances('foo')).to eq(deployments)
       end
     end
   end
@@ -63,6 +63,10 @@ describe 'Bhm::Director' do
   context 'when director is running in UAA mode' do
     before do
       token_issuer = instance_double(CF::UAA::TokenIssuer)
+
+      allow(File).to receive(:exist?).with('fake-ca-cert').and_return(true)
+      allow(File).to receive(:read).with('fake-ca-cert').and_return("test")
+
       allow(CF::UAA::TokenIssuer).to receive(:new).with(
           'http://localhost:8080/uaa',
           'hm',

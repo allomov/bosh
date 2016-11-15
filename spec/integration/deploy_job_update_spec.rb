@@ -10,22 +10,54 @@ describe 'deploy job update', type: :integration do
     manifest_hash['properties'] = { 'test_property' => 2 }
     deploy_from_scratch(manifest_hash: manifest_hash)
 
-    times = start_and_finish_times_for_job_updates('last')
-    expect(times['foobar/1']['started']).to be >= times['foobar/0']['started']
-    expect(times['foobar/1']['started']).to be <= times['foobar/0']['finished']
-    expect(times['foobar/2']['started']).to be >= [times['foobar/0']['finished'], times['foobar/1']['finished']].min
+    updating_job_events = events('last').select { |e| e['stage'] == 'Updating instance' }
+    expect(updating_job_events[0]['state']).to eq('started')
+    expect(updating_job_events[1]['state']).to eq('started')
+    expect(updating_job_events[2]['state']).to eq('finished')
+  end
+
+  it 'updates a job taking into account max_in_flight and canaries as percents' do
+    manifest_hash = Bosh::Spec::Deployments.simple_manifest
+    manifest_hash['update']['canaries'] = '40%'
+    manifest_hash['update']['max_in_flight'] = '70%'
+    deploy_from_scratch(manifest_hash: manifest_hash)
+
+    updating_job_events = events('last').select { |e| e['stage'] == 'Updating instance' }
+    expect(updating_job_events[0]['state']).to eq('started')
+    expect(updating_job_events[0]['task']).to include('(canary)')
+    expect(updating_job_events[1]['state']).to eq('finished')
+    expect(updating_job_events[1]['task']).to include('(canary)')
+    expect(updating_job_events[2]['state']).to eq('started')
+    expect(updating_job_events[3]['state']).to eq('started')
+    expect(updating_job_events[4]['state']).to eq('finished')
+    expect(updating_job_events[5]['state']).to eq('finished')
+
+    manifest_hash['jobs'][0]['instances'] = 1
+    manifest_hash['update']['max_in_flight'] = '40%'
+    deploy_simple_manifest(manifest_hash: manifest_hash)
+
+    deleting_job_events = events('last').select { |e| e['stage'] == 'Deleting unneeded instances' }
+    expect(deleting_job_events[0]['state']).to eq('started')
+    expect(deleting_job_events[1]['state']).to eq('finished')
+    expect(deleting_job_events[2]['state']).to eq('started')
+    expect(deleting_job_events[3]['state']).to eq('finished')
   end
 
   describe 'Displaying manifest diffs' do
     let(:cloud_config_hash) { Bosh::Spec::Deployments.simple_cloud_config }
+    let(:runtime_config_hash) { Bosh::Spec::Deployments.runtime_config_with_addon }
     let(:manifest_hash) { Bosh::Spec::Deployments.simple_manifest }
 
-    it 'only accurately reports deployment configuration changes and not cloud configuration changes' do
+    it 'accurately reports deployment configuration changes, cloud configuration changes and runtime config changes' do
+
       deploy_from_scratch
+
+      bosh_runner.run("upload release #{spec_asset('dummy2-release.tgz')}")
 
       cloud_config_hash['resource_pools'][0]['size'] = 2
 
       upload_cloud_config(cloud_config_hash: cloud_config_hash)
+      upload_runtime_config(runtime_config_hash: runtime_config_hash)
 
       manifest_hash['update']['canary_watch_time'] = 0
       manifest_hash['jobs'][0]['instances'] = 2
@@ -33,10 +65,21 @@ describe 'deploy job update', type: :integration do
       set_deployment(manifest_hash: manifest_hash)
 
       deploy_output = deploy(failure_expected: true, redact_diff: true)
-      expect(deploy_output).to match(/Update\nChanges found - Redacted/m)
-      expect(deploy_output).to match(/Jobs\nChanges found - Redacted/m)
 
-      expect(deploy_output).to_not match(/Resource pools\nChanges found - Redacted/m)
+      expect(deploy_output).to match(/resource_pools:/)
+      expect(deploy_output).to match(/update:/)
+      expect(deploy_output).to match(/jobs:/)
+      expect(deploy_output).to match(/addons:/)
+      expect(deploy_output).to match(/dummy2/)
+
+      # ensure it doesn't show the diff the second time
+      deploy_output = deploy(failure_expected: true, redact_diff: true)
+
+      expect(deploy_output).to_not match(/resource_pools:/)
+      expect(deploy_output).to_not match(/update:/)
+      expect(deploy_output).to_not match(/jobs:/)
+      expect(deploy_output).to_not match(/addons:/)
+      expect(deploy_output).to_not match(/dummy2/)
     end
 
     context 'when using legacy deployment configuration' do
@@ -62,21 +105,14 @@ describe 'deploy job update', type: :integration do
             upload_cloud_config(cloud_config_hash: cloud_config_hash)
           end
 
-          it 'fails to update deployment' do
-            set_deployment(manifest_hash: modified_legacy_manifest_hash)
-
-            deploy_output = deploy(failure_expected: true)
-            expect(deploy_output).to match(/Deployment manifest should not contain cloud config properties/)
-          end
-
           context 'when new deployment was updated to not contain cloud properties' do
-            it 'succeeds and incorrectly reports changes' do
+            it 'succeeds and correctly reports changes' do
               set_deployment(manifest_hash: manifest_hash)
 
               deploy_output = deploy(redact_diff: true)
-              expect(deploy_output).to match(/Compilation\nChanges found - Redacted/m)
-              expect(deploy_output).to match(/Resource pools\nChanges found - Redacted/m)
-              expect(deploy_output).to match(/Disk pools\nNo changes/m)
+              expect(deploy_output).to_not match(/compilation:/)
+              expect(deploy_output).to_not match(/resource_pools:/)
+              expect(deploy_output).to_not match(/disk_pools:/)
             end
           end
         end
@@ -94,10 +130,9 @@ describe 'deploy job update', type: :integration do
           set_deployment(manifest_hash: modified_legacy_manifest_hash)
 
           deploy_output = deploy(failure_expected: true, redact_diff: true)
-          expect(deploy_output).to match(/Update\nChanges found - Redacted/m)
-          expect(deploy_output).to match(/Resource pools\nChanges found - Redacted/m)
-          expect(deploy_output).to match(/Disk pools\nNo changes/m)
-          expect(deploy_output).to match(/Jobs\nChanges found - Redacted/m)
+          expect(deploy_output).to match(/resource_pools:/)
+          expect(deploy_output).to match(/update:/)
+          expect(deploy_output).to match(/jobs:/)
         end
       end
     end
@@ -106,7 +141,7 @@ describe 'deploy job update', type: :integration do
   it 'stops deployment when a job update fails' do
     deploy_from_scratch
 
-    director.vm('foobar/0').fail_job
+    director.vm('foobar', '0').fail_job
 
     cloud_config_hash = Bosh::Spec::Deployments.simple_cloud_config
     cloud_config_hash['resource_pools'][0]['size'] = 2
@@ -124,12 +159,12 @@ describe 'deploy job update', type: :integration do
     task_events = events(task_id)
 
     failing_job_event = task_events[-2]
-    expect(failing_job_event['stage']).to eq('Updating job')
+    expect(failing_job_event['stage']).to eq('Updating instance')
     expect(failing_job_event['state']).to eq('failed')
-    expect(failing_job_event['task']).to eq('foobar/0 (canary)')
+    expect(scrub_random_ids(failing_job_event['task'])).to eq('foobar/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (0) (canary)')
 
     started_job_events = task_events.select do |e|
-      e['stage'] == 'Updating job' && e['state'] == "started"
+      e['stage'] == 'Updating instance' && e['state'] == "started"
     end
 
     expect(started_job_events.size).to eq(1)
@@ -138,7 +173,7 @@ describe 'deploy job update', type: :integration do
   def start_and_finish_times_for_job_updates(task_id)
     jobs = {}
     events(task_id).select do |e|
-      e['stage'] == 'Updating job' && %w(started finished).include?(e['state'])
+      e['stage'] == 'Updating instance' && %w(started finished).include?(e['state'])
     end.each do |e|
       jobs[e['task']] ||= {}
       jobs[e['task']][e['state']] = e['time']

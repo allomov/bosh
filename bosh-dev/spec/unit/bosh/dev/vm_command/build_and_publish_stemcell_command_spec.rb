@@ -10,6 +10,7 @@ module Bosh::Dev
         'CANDIDATE_BUILD_NUMBER' => 'fake-CANDIDATE_BUILD_NUMBER',
         'BOSH_AWS_ACCESS_KEY_ID' => 'fake-BOSH_AWS_ACCESS_KEY_ID',
         'BOSH_AWS_SECRET_ACCESS_KEY' => 'fake-BOSH_AWS_SECRET_ACCESS_KEY',
+        'BOSHIO_BEARER_TOKEN' => 'fake-BOSHIO_BEARER_TOKEN',
       }
     end
 
@@ -36,19 +37,17 @@ module Bosh::Dev
       it 'is the command to execute on vagrant to build and publish a stemcell' do
         expected_cmd = <<-BASH
           set -eu
-
           cd /bosh
-
           export CANDIDATE_BUILD_NUMBER='fake-CANDIDATE_BUILD_NUMBER'
           export BOSH_AWS_ACCESS_KEY_ID='fake-BOSH_AWS_ACCESS_KEY_ID'
           export BOSH_AWS_SECRET_ACCESS_KEY='fake-BOSH_AWS_SECRET_ACCESS_KEY'
-
+          export BOSHIO_BEARER_TOKEN='fake-BOSHIO_BEARER_TOKEN'
           bundle exec rake stemcell:build[fake-infrastructure_name,fake-hypervisor_name,fake-operating_system_name,fake-operating_system_version,fake-agent_name,fake-bucket,fake-key]
           bundle exec rake ci:publish_stemcell[fake-stemcell-1.tgz,fake-publish-bucket]
           bundle exec rake ci:publish_stemcell[fake-stemcell-2.tgz,fake-publish-bucket]
         BASH
 
-        expect(strip_heredoc(subject.to_s)).to eq(strip_heredoc(expected_cmd))
+        expect(subject.to_s).to eq(strip_heredoc(expected_cmd).chomp)
       end
 
       context "when the environment contains UBUNTU_ISO" do
@@ -60,10 +59,5 @@ module Bosh::Dev
         end
       end
     end
-
-    def strip_heredoc(str)
-      str.gsub(/^\s+/, '').chomp
-    end
   end
 end
-

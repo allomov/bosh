@@ -8,7 +8,7 @@ module Bosh::Director
     def initialize(job_class, task_id)
       unless job_class.kind_of?(Class) &&
         job_class <= Jobs::BaseJob
-        raise DirectorError, "Invalid director job class `#{job_class}'"
+        raise DirectorError, "Invalid director job class '#{job_class}'"
       end
 
       @task_id = task_id
@@ -19,6 +19,7 @@ module Bosh::Director
       @job_class = job_class
       @task_logger.info("Looking for task with task id #{@task_id}")
       @task = task_manager.find_task(@task_id)
+      @task_logger.info("Found task #{@task.inspect}")
     end
 
     # Runs director job
@@ -32,13 +33,6 @@ module Bosh::Director
 
       duration = Duration.duration(Time.now - started_at)
       @task_logger.info("Task took #{duration} to process.")
-    end
-
-    # Task checkpoint: updates timestamp so running task isn't marked as
-    # timed out.
-    # @return [void]
-    def checkpoint
-      @task.update(:checkpoint_time => Time.now)
     end
 
     private
@@ -66,17 +60,8 @@ module Bosh::Director
       Config.result = TaskResultFile.new(result_log)
       Config.logger = @task_logger
 
-      # use a separate logger with the same appender to avoid multiple file writers
-      redis_task_logger = Logging::Logger.new('DirectorJobRunnerRedis')
-      redis_task_logger.add_appenders(shared_appender)
-      redis_task_logger.level = Config.redis_logger_level
-      Config.redis_logger = redis_task_logger
-
       Config.db.logger = @task_logger
-
-      if Config.dns_enabled?
-        Config.dns_db.logger = @task_logger
-      end
+      Config.dns_db.logger = @task_logger if Config.dns_db
 
       cpi_log = File.join(log_dir, 'cpi')
       Config.cloud_options['properties'] ||= {}
@@ -98,14 +83,29 @@ module Bosh::Director
 
       run_checkpointing
 
-      @task_logger.info("Performing task: #{@task.id}")
+      @task_logger.info("Performing task: #{@task.inspect}")
 
       @task.state = :processing
       @task.timestamp = Time.now
+      @task.started_at = Time.now
       @task.checkpoint_time = Time.now
       @task.save
 
-      result = job.perform
+      result = nil
+      if job.dry_run?
+        Bosh::Director::Config.db.transaction(:rollback => :always) do
+          if Bosh::Director::Config.dns_db
+            Bosh::Director::Config.dns_db.transaction(:rollback => :always) do
+              result = job.perform
+            end
+          else
+            result = job.perform
+          end
+        end
+      else
+        result = job.perform
+      end
+
 
       @task_logger.info('Done')
       finish_task(:done, result)
@@ -122,14 +122,18 @@ module Bosh::Director
 
     # Spawns a thread that periodically updates task checkpoint time.
     # There is no need to kill this thread as job execution lifetime is the
-    # same as Resque worker process lifetime.
+    # same as worker process lifetime.
     # @return [Thread] Checkpoint thread
     def run_checkpointing
+      # task check pointer is scoped to separate class to avoid
+      # the secondary thread and main thread modifying the same @task
+      # variable (and accidentally clobbering it in the process)
+      task_checkpointer = TaskCheckPointer.new(@task.id)
       Thread.new do
         with_thread_name("task:#{@task.id}-checkpoint") do
           while true
             sleep(Config.task_checkpoint_interval)
-            checkpoint
+            task_checkpointer.checkpoint
           end
         end
       end
@@ -167,6 +171,16 @@ module Bosh::Director
       director_error = DirectorError.create_from_exception(exception)
       Config.event_log.log_error(director_error)
     end
+  end
 
+  class TaskCheckPointer
+    def initialize(task_id)
+      task_manager = Bosh::Director::Api::TaskManager.new
+      @task = task_manager.find_task(task_id)
+    end
+
+    def checkpoint
+      @task.update(:checkpoint_time => Time.now)
+    end
   end
 end

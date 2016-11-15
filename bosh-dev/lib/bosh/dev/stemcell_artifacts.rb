@@ -21,6 +21,12 @@ module Bosh::Dev
 
       'openstack-kvm-ubuntu-trusty' => ['openstack', 'kvm', 'ubuntu', 'trusty', 'go', false],
       'openstack-kvm-centos' => ['openstack', 'kvm', 'centos', '7', 'go', false],
+
+      'google-kvm-ubuntu-trusty' => ['google', 'kvm', 'ubuntu', 'trusty', 'go', false],
+      'google-kvm-centos' => ['google', 'kvm', 'centos', '7', 'go', false],
+
+      'azure-hyperv-ubuntu-trusty' => ['azure', 'hyperv', 'ubuntu', 'trusty', 'go', false],
+      'azure-hyperv-centos' => ['azure', 'hyperv', 'centos', '7', 'go', false],
     }
 
     class << self

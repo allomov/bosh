@@ -51,7 +51,7 @@ namespace :ci do
     require 'bosh/dev/vm_command/build_and_publish_stemcell_command'
 
     definition = Bosh::Stemcell::Definition.for(args.infrastructure_name, args.hypervisor_name, args.operating_system_name, args.operating_system_version, args.agent_name, false)
-    environment = Bosh::Stemcell::BuildEnvironment.new(ENV.to_hash, definition, Bosh::Dev::Build.candidate.number, nil, nil)
+    environment = Bosh::Stemcell::BuildEnvironment.new(ENV.to_hash, definition, Bosh::Dev::Build.candidate.number, nil)
 
     stemcell_vm = Bosh::Dev::StemcellVm.new(args.vm_name)
     command = Bosh::Dev::VmCommand::BuildAndPublishStemcellCommand.new(environment, ENV, args.to_hash)
@@ -66,13 +66,6 @@ namespace :ci do
     stemcell_vm = Bosh::Dev::StemcellVm.new(args.vm_name)
     command = Bosh::Dev::VmCommand::BuildAndPublishOsImageCommand.new(ENV, args.to_hash)
     stemcell_vm.run(command)
-  end
-
-  desc 'Promote from pipeline to artifacts bucket'
-  task :promote_artifacts do
-    require 'bosh/dev/build'
-    build = Bosh::Dev::Build.candidate
-    build.promote_artifacts
   end
 
   desc 'Promote candidate sha to stable branch outside of the promote_artifacts task'

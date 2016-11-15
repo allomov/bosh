@@ -4,9 +4,10 @@ module Bosh::Director
   module Api::Controllers
     class StemcellsController < BaseController
       post '/', :consumes => :json do
-        payload = json_decode(request.body)
+        payload = json_decode(request.body.read)
         options = {
             fix: params['fix'] == 'true',
+            sha1: payload['sha1']
         }
         task = @stemcell_manager.create_stemcell_from_url(current_user, payload['location'], options)
         redirect "/tasks/#{task.id}"
@@ -15,21 +16,14 @@ module Bosh::Director
       post '/', :consumes => :multipart do
         options = {
             fix: params['fix'] == 'true',
+            sha1: params['sha1']
         }
         task = @stemcell_manager.create_stemcell_from_file_path(current_user, params[:nginx_upload_path], options)
         redirect "/tasks/#{task.id}"
       end
 
-      get '/', scope: :read do
-        stemcells = Models::Stemcell.order_by(:name.asc).map do |stemcell|
-          {
-            'name' => stemcell.name,
-            'operating_system' => stemcell.operating_system,
-            'version' => stemcell.version,
-            'cid' => stemcell.cid,
-            'deployments' => stemcell.deployments.map { |d| { name: d.name } }
-          }
-        end
+      get '/', scope: :read_stemcells do
+        stemcells = @stemcell_manager.find_all_stemcells
         json_encode(stemcells)
       end
 

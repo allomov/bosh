@@ -48,7 +48,6 @@ module Bosh::Director
       end
     end
 
-
     def self.it_acts_as_synchronous_message(message_name)
       describe "##{message_name}" do
         let(:task) do
@@ -78,10 +77,16 @@ module Bosh::Director
       end
     end
 
+    def self.it_acts_as_message_with_timeout(message_name)
+      it 'waits for results with timeout' do
+        expect(client).to receive(:send_message_with_timeout).exactly(1).times
+        client.public_send(message_name, 'fake', 'args')
+      end
+    end
+
     context 'task is asynchronous' do
       describe 'it has agent_task_id' do
-        subject(:client) { AgentClient.with_defaults('fake-agent_id') }
-        let(:vm_model) { instance_double('Bosh::Director::Models::Vm', credentials: nil, agent_id: 'fake-agent_id') }
+        subject(:client) { AgentClient.with_vm_credentials_and_agent_id(nil, 'fake-agent-id') }
         let(:task) do
           {
               'agent_task_id' => 'fake-agent_task_id',
@@ -90,12 +95,7 @@ module Bosh::Director
           }
         end
 
-        before do
-          allow(Models::Vm).to receive(:find).with(agent_id: 'fake-agent_id').and_return(vm_model)
-        end
-
         describe 'send asynchronous messages' do
-
           before do
             allow(Config).to receive(:nats_rpc)
             allow(Api::ResourceManager).to receive(:new)
@@ -109,41 +109,61 @@ module Bosh::Director
           it_acts_as_asynchronous_message :migrate_disk
           it_acts_as_asynchronous_message :mount_disk
           it_acts_as_asynchronous_message :unmount_disk
-          it_acts_as_asynchronous_message :configure_networks
           it_acts_as_asynchronous_message :stop
           it_acts_as_asynchronous_message :cancel_task
           it_acts_as_asynchronous_message :list_disk
-          it_acts_as_asynchronous_message :prepare_network_change
-          it_acts_as_asynchronous_message :prepare_configure_networks
+          it_acts_as_asynchronous_message :associate_disks
           it_acts_as_asynchronous_message :start
         end
 
         describe 'update_settings' do
-          it 'packages the certificates into a map and sends to the agent' do
-            expect(client).to receive(:send_message).with(:update_settings, "trusted_certs" => "these are the certificates")
+          it 'packages the certificates and disk associations into a map and sends to the agent' do
+            expect(client).to receive(:send_message).with(
+              :update_settings,
+              {
+              "trusted_certs" => "these are the certificates",
+              'disk_associations' => [{'name' => 'zak', 'cid' => 'new-disk-cid'}]
+              })
             allow(client).to receive(:get_task)
-            client.update_settings("these are the certificates")
+            client.update_settings("these are the certificates", [{'name' => 'zak', 'cid' => 'new-disk-cid'}])
           end
 
           it 'periodically polls the update settings task while it is running' do
             allow(client).to receive(:handle_message_with_retry).and_return task
             allow(client).to receive(:sleep).with(AgentClient::DEFAULT_POLL_INTERVAL)
             expect(client).to receive(:get_task).with('fake-agent_task_id')
-            client.update_settings("these are the certificates")
+            client.update_settings("these are the certificates", [{'name' => 'zak', 'cid' => 'new-disk-cid'}])
           end
 
           it 'is only a warning when the remote agent does not implement update_settings' do
             allow(client).to receive(:handle_method).and_raise(RpcRemoteException, "unknown message update_settings")
 
             expect(Config.logger).to receive(:warn).with("Ignoring update_settings 'unknown message' error from the agent: #<Bosh::Director::RpcRemoteException: unknown message update_settings>")
-            expect { client.update_settings("no certs") }.to_not raise_error
+            expect { client.update_settings("no certs", "no disks") }.to_not raise_error
           end
 
           it 'still raises an exception for other RPC failures' do
             allow(client).to receive(:handle_method).and_raise(RpcRemoteException, "random failure!")
 
             expect(client).to_not receive(:warning)
-            expect { client.update_settings("no certs") }.to raise_error
+            expect { client.update_settings("no certs", "no disks") }.to raise_error
+          end
+        end
+
+        describe 'cancel drain' do
+          it 'should stop execution if task was canceled' do
+            allow(client).to receive(:sleep).with(AgentClient::DEFAULT_POLL_INTERVAL)
+            expect(client).to receive(:start_task).and_return task
+            expect(client).to receive(:get_task_status).and_return task
+
+            cancel_task = task.dup
+            cancel_task['state'] = 'not running'
+            expect(client).to receive(:cancel_task).and_return cancel_task
+
+            task_cancelled = TaskCancelled.new(1)
+            expect(Config).to receive(:job_cancelled?).and_raise(task_cancelled)
+
+            expect{client.drain("fake", "args")}.to raise_error(task_cancelled)
           end
         end
 
@@ -177,15 +197,77 @@ module Bosh::Director
           end
         end
 
+        context 'task can time out' do
+          it_acts_as_message_with_timeout :stop
+        end
       end
+    end
+
+    context 'task is fired and forgotten' do
+      describe 'delete_arp_entries' do
+        subject(:client) { AgentClient.with_vm_credentials_and_agent_id(nil, 'fake-agent-id') }
+        let(:task) do
+          {
+            'agent_task_id' => 'fake-agent_task_id',
+            'state' => 'running',
+            'value' => 'task value'
+          }
+        end
+
+        before do
+          allow(Config).to receive(:nats_rpc)
+          allow(Api::ResourceManager).to receive(:new)
+        end
+
+        it 'sends delete_arp_entries to the agent' do
+          expect(client).to receive(:send_nats_request) do |message_name, args|
+            expect(message_name).to eq(:delete_arp_entries)
+            expect(args).to eq([ips: ['10.10.10.1', '10.10.10.2']])
+          end
+          client.delete_arp_entries(ips: ['10.10.10.1', '10.10.10.2'])
+        end
+
+        it 'does not raise an exception for failures' do
+          allow(client).to receive(:send_nats_request).and_raise(RpcRemoteException, 'random failure!')
+
+          expect(Config.logger).to receive(:warn).with("Ignoring 'random failure!' error from the agent: #<Bosh::Director::RpcRemoteException: random failure!>. Received while trying to run: delete_arp_entries on client: 'fake-agent-id'")
+          expect { client.delete_arp_entries(ips: ['10.10.10.1', '10.10.10.2']) }.to_not raise_error
+        end
+      end
+    end
+
+    describe '#sync_dns' do
+      before do
+        allow(Config).to receive(:nats_rpc)
+        allow(Api::ResourceManager).to receive(:new)
+      end
+
+      subject(:client) { AgentClient.with_vm_credentials_and_agent_id(nil, 'fake-agent-id', timeout: 0.1) }
+        before do
+          allow(Config).to receive(:nats_rpc)
+          allow(Api::ResourceManager).to receive(:new)
+        end
+
+        it 'sends sync_dns to the agent' do
+          expect(client).to receive(:send_nats_request) do |message_name, args|
+            expect(message_name).to eq(:sync_dns)
+            expect(args).to eq([blobstore_id: 'fake-blob-id', sha1: 'fake-sha1'])
+          end
+          client.sync_dns(blobstore_id: 'fake-blob-id', sha1: 'fake-sha1')
+        end
+
+        it 'sends sync_dns to the agent with version parameter' do
+          expect(client).to receive(:send_nats_request) do |message_name, args|
+            expect(message_name).to eq(:sync_dns)
+            expect(args).to eq([blobstore_id: 'fake-blob-id', sha1: 'fake-sha1', version: 1])
+          end
+          client.sync_dns(blobstore_id: 'fake-blob-id', sha1: 'fake-sha1', version: 1)
+        end
     end
 
     context 'task is synchronous' do
       describe 'it does not have agent_task_id' do
-        subject(:client) { AgentClient.with_defaults('fake-agent_id') }
-
-        before { allow(Models::Vm).to receive(:find).with(agent_id: 'fake-agent_id').and_return(vm_model) }
-        let(:vm_model) { instance_double('Bosh::Director::Models::Vm', credentials: nil, agent_id: 'fake-agent_id') }
+        subject(:client) { AgentClient.with_vm_credentials_and_agent_id(nil, 'fake-agent-id') }
 
         before do
           allow(Config).to receive(:nats_rpc)
@@ -196,11 +278,9 @@ module Bosh::Director
         it_acts_as_synchronous_message :cancel_task
         it_acts_as_synchronous_message :get_state
         it_acts_as_synchronous_message :list_disk
-        it_acts_as_synchronous_message :prepare_network_change
         it_acts_as_synchronous_message :start
       end
     end
-
 
     describe 'ping <=> pong' do
       let(:stemcell) do
@@ -211,29 +291,12 @@ module Bosh::Director
         { 'network_a' => { 'ip' => '1.2.3.4' } }
       end
 
-      let(:vm_model) do
-        cloud = instance_double('Bosh::Cloud')
-        allow(Config).to receive(:cloud).and_return(cloud)
-        env = {}
-        deployment = Models::Deployment.make
-        cloud_properties = { 'ram' => '2gb' }
-        allow(cloud).to receive(:create_vm).with(kind_of(String), 'stemcell-id',
-                                    { 'ram' => '2gb' }, network_settings, [99],
-                                    { 'bosh' =>
-                                        { 'credentials' =>
-                                            { 'crypt_key' => kind_of(String),
-                                              'sign_key' => kind_of(String) } } })
-        VmCreator.new.create(deployment, stemcell,
-                             cloud_properties,
-                             network_settings, Array(99),
-                             env)
-      end
-
+      let(:credentials) { Bosh::Core::EncryptionHandler.generate_credentials }
       subject(:client) do
-        AgentClient.with_defaults(vm_model.agent_id)
+        AgentClient.with_vm_credentials_and_agent_id(credentials, 'fake-agent-id')
       end
 
-      it 'should use vm credentials' do
+      it 'should use provided credentials' do
         nats_rpc = double('nats_rpc')
 
         allow(Config).to receive(:nats_rpc).and_return(nats_rpc)
@@ -241,7 +304,7 @@ module Bosh::Director
 
         allow(App).to receive_messages(instance: double('App Instance').as_null_object)
 
-        handler = Bosh::Core::EncryptionHandler.new(vm_model.agent_id, vm_model.credentials)
+        handler = Bosh::Core::EncryptionHandler.new('fake-agent-id', credentials)
         expect(nats_rpc).to receive(:send_request) do |*args, &blk|
           data = args[1]['encrypted_data']
           handler.decrypt(data) # decrypt to initiate session
@@ -401,6 +464,21 @@ module Bosh::Director
           expect(client).to receive(:ping).and_raise(Bosh::Director::RpcRemoteException, 'remote exception')
 
           expect { client.wait_until_ready }.to raise_error(Bosh::Director::RpcRemoteException)
+        end
+
+        it 'should raise an exception if task was cancelled' do
+          testjob_class = Class.new(Jobs::BaseJob) do
+            define_method :perform do
+              'foo'
+            end
+          end
+          task_id = 1
+          tasks_dir = Dir.mktmpdir
+          allow(Config).to receive(:base_dir).and_return(tasks_dir)
+          allow(Config).to receive(:cloud_options).and_return({})
+          task = Models::Task.make(:id => task_id, :state => 'cancelling')
+          testjob_class.perform(task_id)
+          expect { client.wait_until_ready }.to raise_error(Bosh::Director::TaskCancelled)
         end
       end
     end
@@ -623,6 +701,73 @@ module Bosh::Director
 
           client.wait_for_task('fake-task-id')
         end
+      end
+
+      context 'when timeout is passed' do
+        let(:fake_timeout_ticks) { 3 }
+
+        it 'uses the timeout if one is passed' do
+          client = AgentClient.new('fake-service-name', 'fake-client-id')
+          timeout = Timeout.new(fake_timeout_ticks)
+
+          nats_rpc_response = {
+            'value' => {
+              'state' => 'running',
+              'value' => 'fake-return-value',
+            }
+          }
+
+          allow(nats_rpc).to receive(:send_request).with(
+              'fake-service-name.fake-client-id', hash_including(method: :get_task, arguments: ['fake-task-id']))
+                               .and_yield(nats_rpc_response)
+
+          expect(client).to receive(:sleep).with(AgentClient::DEFAULT_POLL_INTERVAL).exactly(fake_timeout_ticks).times
+          expect(timeout).to receive(:timed_out?).exactly(fake_timeout_ticks).times.and_return(false)
+          expect(timeout).to receive(:timed_out?).and_return(true)
+          expect(client.wait_for_task('fake-task-id', timeout)).to eq('fake-return-value')
+        end
+      end
+    end
+
+    describe '#stop' do
+      let(:nats_rpc) { instance_double('Bosh::Director::NatsRpc') }
+      let(:fake_timeout_ticks) { 3 }
+
+      before { allow(Config).to receive(:nats_rpc).and_return(nats_rpc) }
+
+      it 'should timeout and continue on after 5 minutes' do
+        handle_method_response = {
+          'agent_task_id' => 'fake-task-id',
+          'value' => 'fake-return-value',
+          'state' => 'running',
+        }
+
+        timeout = Timeout.new(fake_timeout_ticks)
+
+        allow(Timeout).to receive(:new).and_return(timeout)
+        client = AgentClient.new('fake-service-name', 'fake-client-id')
+
+        expect(client).to receive(:handle_method).with(:stop, []).once.and_return(handle_method_response)
+        expect(client).to receive(:handle_method).with(:get_task, ['fake-task-id']).exactly(fake_timeout_ticks + 1).times.and_return(handle_method_response)
+
+        expect(client).to receive(:sleep).with(AgentClient::DEFAULT_POLL_INTERVAL).exactly(fake_timeout_ticks).times
+        expect(timeout).to receive(:timed_out?).exactly(fake_timeout_ticks).times.and_return(false)
+        expect(timeout).to receive(:timed_out?).and_return(true)
+
+        client.stop
+      end
+
+      it 'should suppress timeout errors received from the agent' do
+        allow(Timeout).to receive(:new).and_return(Timeout.new(fake_timeout_ticks))
+
+        client = AgentClient.new('fake-service-name', 'fake-client-id')
+
+        expect(Config.logger).to receive(:warn).with("Ignoring stop timeout error from the agent: #<Bosh::Director::RpcRemoteException: Timed out waiting for service 'foo'.>")
+
+        expect(client).to receive(:handle_method).with(:stop, []).once.and_return({ 'agent_task_id' => 'fake-task-id' })
+        expect(client).to receive(:handle_method).and_raise(RpcRemoteException, "Timed out waiting for service 'foo'.")
+
+        client.stop
       end
     end
   end

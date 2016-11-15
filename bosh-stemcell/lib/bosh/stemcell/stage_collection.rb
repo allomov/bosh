@@ -18,8 +18,8 @@ module Bosh::Stemcell
           rhel_os_stages
         when OperatingSystem::Ubuntu then
           ubuntu_os_stages
-        when OperatingSystem::Photon then
-          photon_os_stages
+        when OperatingSystem::Photonos then
+          photonos_os_stages
       end
     end
 
@@ -31,11 +31,11 @@ module Bosh::Stemcell
 
     def agent_stages
       [
-        :bosh_ruby,
+        :bosh_libyaml,
         :bosh_go_agent,
-        :bosh_micro_go,
         :aws_cli,
         :logrotate_config,
+        :dev_tools_config,
       ]
     end
 
@@ -43,14 +43,20 @@ module Bosh::Stemcell
       stages = case infrastructure
       when Infrastructure::Aws then
         aws_stages
+      when Infrastructure::Google then
+        google_stages
       when Infrastructure::OpenStack then
         openstack_stages
       when Infrastructure::Vsphere then
-        vsphere_stages
+        vsphere_vcloud_stages
       when Infrastructure::Vcloud then
-        vcloud_stages
+        vsphere_vcloud_stages
       when Infrastructure::Warden then
         warden_stages
+      when Infrastructure::Azure then
+        azure_stages
+      when Infrastructure::Softlayer then
+        softlayer_stages
       end
 
       stages.concat(finish_stemcell_stages)
@@ -60,10 +66,14 @@ module Bosh::Stemcell
       case disk_format
         when 'raw' then
           raw_package_stages
+        when 'rawdisk' then
+          rawdisk_package_stages
         when 'qcow2' then
           qcow2_package_stages
         when 'ovf' then
           ovf_package_stages
+        when 'vhd' then
+          vhd_package_stages
         when 'files' then
           files_package_stages
       end
@@ -74,40 +84,117 @@ module Bosh::Stemcell
     def_delegators :@definition, :infrastructure, :operating_system, :agent
 
     def openstack_stages
-      if is_centos? || is_rhel?
+      stages = if is_centos? || is_rhel?
         [
           :system_network,
-          # Misc
-          :system_parameters,
-          # Finalisation,
-          :bosh_clean,
-          :bosh_harden,
-          :bosh_disable_password_authentication,
-          :bosh_openstack_agent_settings,
-          :disable_blank_passwords,
-          :bosh_clean_ssh,
-          :image_create,
-          :image_install_grub,
         ]
       else
         [
           :system_network,
-          # Misc
           :system_openstack_clock,
           :system_openstack_modules,
-          :system_parameters,
-          # Finalisation,
-          :bosh_clean,
-          :bosh_harden,
-          :bosh_disable_password_authentication,
-          :bosh_openstack_agent_settings,
-          :disable_blank_passwords,
-          :bosh_clean_ssh,
-          # Image/bootloader
-          :image_create,
-          :image_install_grub,
         ]
       end
+
+      stages += [
+        :system_parameters,
+        :bosh_clean,
+        :bosh_harden,
+        :bosh_openstack_agent_settings,
+        :bosh_clean_ssh,
+        :image_create,
+        :image_install_grub,
+      ]
+    end
+
+    def vsphere_vcloud_stages
+      [
+        :system_network,
+        :system_open_vm_tools,
+        :system_vsphere_cdrom,
+        :system_parameters,
+        :bosh_clean,
+        :bosh_harden,
+        :bosh_enable_password_authentication,
+        :bosh_vsphere_agent_settings,
+        :bosh_clean_ssh,
+        :image_create,
+        :image_install_grub,
+      ]
+    end
+
+    def aws_stages
+      [
+        :system_network,
+        :system_aws_modules,
+        :system_parameters,
+        :bosh_clean,
+        :bosh_harden,
+        :bosh_aws_agent_settings,
+        :bosh_clean_ssh,
+        :image_create,
+        :image_install_grub,
+        :image_aws_update_grub,
+      ]
+    end
+
+    def google_stages
+      [
+        :system_network,
+        :system_google_modules,
+        :system_google_packages,
+        :system_parameters,
+        :bosh_clean,
+        :bosh_harden,
+        :bosh_google_agent_settings,
+        :bosh_clean_ssh,
+        :image_create,
+        :image_install_grub,
+      ]
+    end
+
+    def warden_stages
+      [
+        :system_parameters,
+        :base_warden,
+        :bosh_clean,
+        :bosh_harden,
+        :bosh_enable_password_authentication,
+        :bosh_clean_ssh,
+        :image_create,
+        :image_install_grub,
+      ]
+    end
+
+    def azure_stages
+      [
+        :system_azure_network,
+        :system_azure_wala,
+        :system_parameters,
+        :enable_udf_module,
+        :bosh_clean,
+        :bosh_harden,
+        :bosh_azure_agent_settings,
+        :bosh_clean_ssh,
+        :image_create,
+        :image_install_grub,
+      ]
+    end
+
+    def softlayer_stages
+      [
+          :system_network,
+          :system_softlayer_open_iscsi,
+          :system_softlayer_multipath_tools,
+          :system_parameters,
+          :bosh_clean,
+          :bosh_harden,
+          :bosh_enable_password_authentication,
+          :bosh_softlayer_agent_settings,
+          :bosh_clean_ssh,
+          :image_create,
+          :image_install_grub,
+      ]
     end
 
     def finish_stemcell_stages
@@ -116,111 +203,8 @@ module Bosh::Stemcell
       ]
     end
 
-    def vsphere_stages
-      if is_centos?
-        [
-          :system_network,
-          :system_open_vm_tools,
-          :system_vsphere_cdrom,
-          :system_parameters,
-          :bosh_clean,
-          :bosh_harden,
-          :bosh_vsphere_agent_settings,
-          :disable_blank_passwords,
-          :bosh_clean_ssh,
-          :image_create,
-          :image_install_grub,
-        ]
-      else
-        [
-          :system_network,
-          :system_open_vm_tools,
-          :system_vsphere_cdrom,
-          # Misc
-          :system_parameters,
-          # Finalisation
-          :bosh_clean,
-          :bosh_harden,
-          :bosh_vsphere_agent_settings,
-          :disable_blank_passwords,
-          :bosh_clean_ssh,
-          # Image/bootloader
-          :image_create,
-          :image_install_grub,
-        ]
-      end
-    end
-
-    def vcloud_stages
-      if is_centos?
-        [
-          :system_network,
-          :system_open_vm_tools,
-          :system_vsphere_cdrom,
-          :system_parameters,
-          :bosh_clean,
-          :bosh_harden,
-          :bosh_vsphere_agent_settings,
-          :disable_blank_passwords,
-          :bosh_clean_ssh,
-          :image_create,
-          :image_install_grub,
-        ]
-      else
-        [
-          :system_network,
-          :system_open_vm_tools,
-          :system_vsphere_cdrom,
-          # Misc
-          :system_parameters,
-          # Finalisation
-          :bosh_clean,
-          :bosh_harden,
-          :bosh_vsphere_agent_settings,
-          :disable_blank_passwords,
-          :bosh_clean_ssh,
-          # Image/bootloader
-          :image_create,
-          :image_install_grub,
-        ]
-      end
-    end
-
-    def aws_stages
-      [
-        # Misc
-        :system_network,
-        :system_aws_modules,
-        :system_parameters,
-        # Finalisation
-        :bosh_clean,
-        :bosh_harden,
-        :bosh_disable_password_authentication,
-        :bosh_aws_agent_settings,
-        :disable_blank_passwords,
-        :bosh_clean_ssh,
-        # Image/bootloader
-        :image_create,
-        :image_install_grub,
-        :image_aws_update_grub,
-      ]
-    end
-
-    def warden_stages
-      [
-        :system_parameters,
-        :base_warden,
-        # Finalisation
-        :bosh_clean,
-        :bosh_harden,
-        :bosh_clean_ssh,
-        # only used for spec test
-        :image_create,
-      ]
-    end
-
     def centos_os_stages
-     [
+      [
         :base_centos,
         :base_runsvdir,
         :base_centos_packages,
@@ -229,11 +213,16 @@ module Bosh::Stemcell
         :system_kernel_modules,
         :system_ixgbevf,
         bosh_steps,
+        :password_policies,
+        :restrict_su_command,
+        :tty_config,
         :rsyslog_config,
         :delay_monit_start,
         :system_grub,
         :cron_config,
-        :escape_ctrl_alt_del
+        :escape_ctrl_alt_del,
+        :bosh_audit,
+        :bosh_log_audit_start,
       ].flatten
     end
 
@@ -268,18 +257,24 @@ module Bosh::Stemcell
         :system_kernel_modules,
         :system_ixgbevf,
         bosh_steps,
+        :password_policies,
+        :restrict_su_command,
+        :tty_config,
         :rsyslog_config,
         :delay_monit_start,
         :system_grub,
         :vim_tiny,
         :cron_config,
         :escape_ctrl_alt_del,
-      ].flatten
+        :system_users,
+        :bosh_audit,
+        :bosh_log_audit_start,
+      ].flatten.reject{ |s| Bosh::Stemcell::Arch.ppc64le? and s ==  :system_ixgbevf }
     end
 
-    def photon_os_stages
+    def photonos_os_stages
       [
-        :base_photon,
+        :base_photonos,
         :base_file_permission,
         bosh_steps,
         :base_ssh,
@@ -293,16 +288,23 @@ module Bosh::Stemcell
     def bosh_steps
       [
         :bosh_sysctl,
+        :bosh_limits,
         :bosh_users,
         :bosh_monit,
         :bosh_ntpdate,
         :bosh_sudoers,
-      ]
+      ].flatten
     end
 
     def raw_package_stages
       [
         :prepare_raw_image_stemcell,
+      ]
+    end
+
+    def rawdisk_package_stages
+      [
+        :prepare_rawdisk_image_stemcell,
       ]
     end
 
@@ -317,6 +319,12 @@ module Bosh::Stemcell
         :image_ovf_vmx,
         :image_ovf_generate,
         :prepare_ovf_image_stemcell,
+      ]
+    end
+
+    def vhd_package_stages
+      [
+        :prepare_vhd_image_stemcell,
       ]
     end
 

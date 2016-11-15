@@ -16,10 +16,6 @@ Gem::Specification.new do |spec|
   spec.files        = Dir['lib/**/*'].select{ |f| File.file? f }
   spec.require_path = 'lib'
 
-  spec.add_dependency 'semi_semantic', '~>1.1.0'
+  spec.add_dependency 'semi_semantic', '~>1.2.0'
   spec.add_dependency 'logging',       '~>1.8.2'
-
-  spec.add_development_dependency 'rake'
-  spec.add_development_dependency 'rspec'
-  spec.add_development_dependency 'rspec-its'
 end

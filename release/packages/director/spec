@@ -4,5 +4,7 @@ dependencies:
 - libpq
 - mysql
 - ruby
+- s3cli
+- davcli
 files:
 - bosh/bosh-director/vendor/cache/*

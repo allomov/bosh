@@ -9,7 +9,7 @@ module Bosh::Stemcell
   describe BuildEnvironment do
     include FakeFS::SpecHelpers
 
-    subject { described_class.new(env, definition, version, release_tarball_path, os_image_tarball_path) }
+    subject { described_class.new(env, definition, version, os_image_tarball_path) }
 
     let(:env) { {} }
 
@@ -23,7 +23,6 @@ module Bosh::Stemcell
     end
 
     let(:version) { '1234' }
-    let(:release_tarball_path) { '1234.tgz' }
     let(:os_image_tarball_path) { '/some/os_image.tgz' }
 
     let(:stemcell_builder_source_dir) { '/fake/path/to/stemcell_builder' }
@@ -35,7 +34,6 @@ module Bosh::Stemcell
       )
     end
 
-    let(:release_tarball_path) { "/fake/path/to/bosh-#{version}.tgz" }
     let(:version) { '007' }
 
     let(:root_dir) do
@@ -87,7 +85,6 @@ module Bosh::Stemcell
         env: env,
         definition: definition,
         version: version,
-        release_tarball: release_tarball_path,
         os_image_tarball: os_image_tarball_path,
       )
 
@@ -186,13 +183,14 @@ module Bosh::Stemcell
 
     describe '#os_image_rspec_command' do
       context 'when operating system has version' do
+        let (:tag) { Bosh::Stemcell::Arch.ppc64le? ? ' --tag ~exclude_on_ppc64le' : '' }
         before { allow(operating_system).to receive(:version).and_return('fake-version') }
 
         it 'returns the correct command' do
           expected_rspec_command = [
             "cd #{stemcell_specs_dir};",
             'OS_IMAGE=/some/os_image.tgz',
-            'bundle exec rspec -fd',
+            "bundle exec rspec -fd#{tag}",
             "spec/os_image/#{operating_system.name}_#{operating_system.version}_spec.rb",
           ].join(' ')
 
@@ -202,6 +200,7 @@ module Bosh::Stemcell
     end
 
     describe '#stemcell_rspec_command' do
+      let (:tag) { Bosh::Stemcell::Arch.ppc64le? ? ' --tag ~exclude_on_ppc64le' : '' }
       before { allow(operating_system).to receive(:version).and_return('fake-version') }
 
       it 'returns the correct command' do
@@ -210,12 +209,13 @@ module Bosh::Stemcell
           "STEMCELL_IMAGE=#{File.join(work_path, 'fake-root-disk-image.raw')}",
           "STEMCELL_WORKDIR=#{work_path}",
           "OS_NAME=#{operating_system.name}",
-          'bundle exec rspec -fd',
+          "bundle exec rspec -fd#{tag}",
           "spec/os_image/#{operating_system.name}_#{operating_system.version}_spec.rb",
           "spec/stemcells/#{operating_system.name}_#{operating_system.version}_spec.rb",
           "spec/stemcells/#{agent.name}_agent_spec.rb",
           "spec/stemcells/#{infrastructure.name}_spec.rb",
           "spec/stemcells/stig_spec.rb",
+          "spec/stemcells/cis_spec.rb",
         ].join(' ')
 
         expect(subject.stemcell_rspec_command).to eq(expected_rspec_command)
@@ -235,6 +235,7 @@ module Bosh::Stemcell
     end
 
     describe '#stemcell_files' do
+      let(:arch) { Bosh::Stemcell::Arch.ppc64le? ? 'ppc64le-' : '' }
       it 'returns the right file path' do
         allow(definition).to receive(:disk_formats) { ['disk-format-1', 'disk-format-2'] }
         allow(definition).to receive(:light?) { true }
@@ -243,8 +244,8 @@ module Bosh::Stemcell
           with('disk-format-2') { 'infra-hypervisor-os-version-disk-format-2' }
 
         expect(subject.stemcell_files).to eq([
-          File.join(work_path, 'light-bosh-stemcell-007-infra-hypervisor-os-version.tgz'),
-          File.join(work_path, 'light-bosh-stemcell-007-infra-hypervisor-os-version-disk-format-2.tgz'),
+          File.join(work_path, "light-bosh-stemcell-#{arch}007-infra-hypervisor-os-version.tgz"),
+          File.join(work_path, "light-bosh-stemcell-#{arch}007-infra-hypervisor-os-version-disk-format-2.tgz"),
         ])
       end
     end

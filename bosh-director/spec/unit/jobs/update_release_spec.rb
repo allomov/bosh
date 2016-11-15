@@ -1,14 +1,16 @@
 require 'spec_helper'
 require 'support/release_helper'
+require 'digest'
 
 module Bosh::Director
   describe Jobs::UpdateRelease do
     before { allow(App).to receive_message_chain(:instance, :blobstores, :blobstore).and_return(blobstore) }
     let(:blobstore) { instance_double('Bosh::Blobstore::BaseClient') }
 
-    describe 'Resque job class expectations' do
+    describe 'DJ job class expectations' do
       let(:job_type) { :update_release }
-      it_behaves_like 'a Resque job'
+      let(:queue) { :normal }
+      it_behaves_like 'a DJ job'
     end
 
     describe 'Compiled release upload' do
@@ -129,6 +131,33 @@ module Bosh::Director
           expect(job).to receive(:process_release)
 
           job.perform
+        end
+
+        context 'with a sha1' do
+          context 'when the sha1 does match' do
+            let(:job_options) { {'remote' => true, 'location' => 'release_location', 'sha1' => Digest::SHA1.file(release_path).hexdigest } }
+            it 'verifies the sha1 matches the release' do
+              allow(job).to receive(:release_path).and_return(release_path)
+
+              expect(job).to receive(:download_remote_release)
+              expect(job).to receive(:process_release)
+
+              job.perform
+            end
+          end
+
+          context 'when the sha1 does not match' do
+            let(:job_options) { {'remote' => true, 'location' => 'release_location', 'sha1' => 'abcd1234'} }
+            it 'raises an error when the sha1 does not match' do
+              allow(job).to receive(:release_path).and_return(release_path)
+
+              expect(job).to receive(:download_remote_release)
+
+              expect {
+                job.perform
+              }.to raise_exception(Bosh::Director::ReleaseSha1DoesNotMatch)
+            end
+          end
         end
       end
 
@@ -338,21 +367,7 @@ module Bosh::Director
 
           expect {
             job.perform
-          }.to raise_exception(Bosh::Director::ReleaseInvalidPackage, /package `fake-name-2' had different fingerprint in previously uploaded release `appcloud\/42\+dev.6'/)
-        end
-      end
-
-      describe 'event_log' do
-        it 'prints that release was created' do
-          allow(Config.event_log).to receive(:begin_stage).and_call_original
-          expect(Config.event_log).to receive(:begin_stage).with('Release has been created', 1)
-          job.perform
-        end
-
-        it 'prints name and version' do
-          allow(Config.event_log).to receive(:track).and_call_original
-          expect(Config.event_log).to receive(:track).with('appcloud/42+dev.6')
-          job.perform
+          }.to raise_exception(Bosh::Director::ReleaseInvalidPackage, /package 'fake-name-2' had different fingerprint in previously uploaded release 'appcloud\/42\+dev.6'/)
         end
       end
 
@@ -400,7 +415,7 @@ module Bosh::Director
 
           expect {
             job.perform
-          }.to raise_exception(Bosh::Director::ReleaseExistingJobFingerprintMismatch, /job `fake-job-1' had different fingerprint in previously uploaded release `appcloud\/42\+dev.6'/)
+          }.to raise_exception(Bosh::Director::ReleaseExistingJobFingerprintMismatch, /job 'fake-job-1' had different fingerprint in previously uploaded release 'appcloud\/42\+dev.6'/)
         end
 
         it "creates jobs that don't already exist" do
@@ -420,6 +435,16 @@ module Bosh::Director
               }
           ], release_dir)
           job.perform
+        end
+
+        context 'when the release contains no packages' do
+          before do
+            manifest.delete('packages')
+          end
+          it 'should not error' do
+            allow(job).to receive(:create_jobs)
+            expect { job.perform }.to_not raise_error
+          end
         end
       end
 
@@ -476,7 +501,14 @@ module Bosh::Director
       end
     end
 
-    describe 'rebasing release' do
+    # mysql2 seems to have an issue when starting a thread inside a transaction
+    # after the thread exits, the connection isn't immediately reaped and when
+    # the example wrapper tries to disconnect from the database it sees
+    # "connection is still in use <Thread .... dead>". Additionally, when debugging
+    # we didn't see any of the transaction data inside of the thread suggesting the
+    # thread's connection was outside the scope of the transaction.
+    # so... we're ignoring these tests which rely on that behavior...
+    describe 'rebasing release', :if => ENV['DB'] != 'mysql' do
       let(:manifest) do
         {
           'name' => 'appcloud',
@@ -726,7 +758,7 @@ module Bosh::Director
       end
 
       it 'performs the rebase if same release is being rebased twice' do
-        Config.configure(Psych.load(spec_asset('test-director-config.yml')))
+        Config.configure(SpecHelper.spec_get_director_config)
         @job.perform
 
         @release_dir = Test::ReleaseHelper.new.create_release_tarball(manifest)
@@ -739,6 +771,350 @@ module Bosh::Director
 
         rv = Models::ReleaseVersion.filter(release_id: @release.id, version: '42+dev.2').first
         expect(rv).to_not be_nil
+      end
+    end
+
+    describe 'uploading release with --fix' do
+      subject(:job) { Jobs::UpdateRelease.new(release_path, 'fix' => true) }
+      let(:release_dir) { Test::ReleaseHelper.new.create_release_tarball(manifest) }
+      let(:release_path) { File.join(release_dir, 'release.tgz') }
+      let!(:release) { Models::Release.make(name: 'appcloud') }
+
+      let!(:release_version_model) {
+        Models::ReleaseVersion.make(
+          release: release,
+          version: '42+dev.1',
+          commit_hash: '12345678',
+          uncommitted_changes: true
+        )
+      }
+      before do
+        allow(Dir).to receive(:mktmpdir).and_return(release_dir)
+        allow(job).to receive(:with_release_lock).and_yield
+      end
+
+      context 'when uploading source release' do
+        let(:manifest) do
+          {
+            'name' => 'appcloud',
+            'version' => '42+dev.1',
+            'commit_hash' => '12345678',
+            'uncommitted_changes' => true,
+            'jobs' => manifest_jobs,
+            'packages' => manifest_packages,
+          }
+        end
+        let(:manifest_jobs) {
+          [
+            {
+              'sha1' => 'fake-sha-2',
+              'fingerprint' => 'fake-fingerprint-2',
+              'name' => 'fake-name-2',
+              'version' => 'fake-version-2',
+              'packages' => [
+                'fake-name-1',
+              ],
+              'templates' => {},
+            },
+          ]
+        }
+        let(:manifest_packages) do
+          [
+            {
+              'sha1' => 'fake-sha-1',
+              'fingerprint' => 'fake-fingerprint-1',
+              'name' => 'fake-name-1',
+              'version' => 'fake-version-1',
+              'dependencies' => []
+            }
+          ]
+        end
+
+        context 'when release already exists' do
+          let!(:package) do
+            package = Models::Package.make(
+              release: release,
+              name: 'fake-name-1',
+              version: 'fake-version-1',
+              fingerprint: 'fake-fingerprint-1',
+              blobstore_id: 'fake-pkg-blobstore-id-1',
+              sha1: 'fake-sha-1'
+            )
+            release_version_model.add_package(package)
+            package
+          end
+
+          let!(:template) do
+            template = Models::Template.make(
+              release: release,
+              name: 'fake-name-2',
+              version: 'fake-version-2',
+              fingerprint: 'fake-fingerprint-2',
+              blobstore_id: 'fake-job-blobstore-id-2',
+              sha1: 'fake-sha-2',
+            )
+            release_version_model.add_template(template)
+            template
+          end
+
+          it 're-uploads all blobs to replace old ones' do
+            expect(BlobUtil).to receive(:delete_blob).with('fake-pkg-blobstore-id-1')
+            expect(BlobUtil).to receive(:delete_blob).with('fake-job-blobstore-id-2')
+
+            expect(BlobUtil).to receive(:create_blob).with(
+              File.join(release_dir, 'packages', 'fake-name-1.tgz')
+            ).and_return('new-blobstore-id-after-fix')
+
+            expect(BlobUtil).to receive(:create_blob).with(
+              File.join(release_dir, 'jobs', 'fake-name-2.tgz')
+            ).and_return('new-job-blobstore-id-after-fix')
+
+            job.perform
+
+            expect(template.reload.blobstore_id).to eq('new-job-blobstore-id-after-fix')
+          end
+        end
+
+        context 'when re-using existing packages' do
+          let!(:another_release) { Models::Release.make(name: 'foocloud') }
+          let!(:old_release_version_model) do
+            Models::ReleaseVersion.make(
+              release: another_release,
+              version: '41+dev.1',
+              commit_hash: '23456789',
+              uncommitted_changes: true
+            )
+          end
+
+          let!(:existing_pkg) do
+            package = Models::Package.make(
+              release: another_release,
+              name: 'fake-name-1',
+              version: 'fake-version-1',
+              fingerprint: 'fake-fingerprint-1',
+              blobstore_id: 'fake-blobstore-id-1',
+              sha1: 'fake-sha-1'
+            ).save
+
+            old_release_version_model.add_package(package)
+            package
+          end
+
+          it 'replaces existing packages and copy blobs' do
+            expect(BlobUtil).to receive(:delete_blob).with('fake-blobstore-id-1')
+            expect(BlobUtil).to receive(:create_blob).with(File.join(release_dir, 'packages', 'fake-name-1.tgz')).and_return('new-blobstore-id-after-fix')
+            expect(BlobUtil).to receive(:create_blob).with(File.join(release_dir, 'jobs', 'fake-name-2.tgz')).and_return('new-job-blobstore-id-after-fix')
+            expect(BlobUtil).to receive(:copy_blob).with('new-blobstore-id-after-fix').and_return('new-blobstore-id')
+            job.perform
+          end
+        end
+
+        context 'eliminates broken compiled packages' do
+          let!(:package) do
+            package = Models::Package.make(
+              release: release,
+              name: 'fake-name-1',
+              version: 'fake-version-1',
+              fingerprint: 'fake-fingerprint-1',
+              blobstore_id: 'fake-pkg-blobstore-id-1',
+              sha1: 'fake-pkg-sha-1'
+            )
+            release_version_model.add_package(package)
+            package
+          end
+          let!(:compiled_package) { Models::CompiledPackage.make(
+            package: package,
+            sha1: 'fake-compiled-sha-1',
+            blobstore_id: 'fake-compiled-pkg-blobstore-id-1',
+            dependency_key: 'fake-dep-key-1',
+            stemcell_os: 'windows me',
+            stemcell_version: '4.5'
+          )}
+
+          it 'verifies package' do
+            expect(BlobUtil).to receive(:verify_blob).with(
+              'fake-compiled-pkg-blobstore-id-1',
+              'fake-compiled-sha-1'
+            ).and_return(true)
+            expect(BlobUtil).to receive(:delete_blob).with('fake-pkg-blobstore-id-1')
+            expect(BlobUtil).to receive(:create_blob).with(
+              File.join(release_dir, 'packages', 'fake-name-1.tgz')
+            ).and_return('new-pkg-blobstore-id-1')
+            expect(BlobUtil).to receive(:create_blob).with(
+              File.join(release_dir, 'jobs', 'fake-name-2.tgz')
+            ).and_return('new-job-blobstore-id-1')
+            expect(Models::CompiledPackage.dataset.count).to eql 1
+
+            job.perform
+          end
+
+          it 'eliminates package when broken or missing' do
+            expect(BlobUtil).to receive(:verify_blob).with(
+              'fake-compiled-pkg-blobstore-id-1',
+              'fake-compiled-sha-1'
+            ).and_return(false)
+            expect(BlobUtil).to receive(:delete_blob).with('fake-pkg-blobstore-id-1')
+            expect(BlobUtil).to receive(:create_blob).with(
+              File.join(release_dir, 'packages', 'fake-name-1.tgz')
+            ).and_return('new-pkg-blobstore-id-1')
+            expect(BlobUtil).to receive(:create_blob).with(
+              File.join(release_dir, 'jobs', 'fake-name-2.tgz')
+            ).and_return('new-job-blobstore-id-1')
+            expect(BlobUtil).to receive(:delete_blob).with('fake-compiled-pkg-blobstore-id-1')
+            expect {
+              job.perform
+            }.to change { Models::CompiledPackage.dataset.count }.from(1).to(0)
+          end
+        end
+      end
+
+      context 'when uploading compiled release' do
+        let(:manifest_jobs) { [] }
+        let(:manifest_compiled_packages) do
+          [
+            {
+              'sha1' => 'fake-sha-1',
+              'fingerprint' => 'fake-fingerprint-1',
+              'name' => 'fake-name-1',
+              'version' => 'fake-version-1',
+              'stemcell' => 'macintosh os/7.1'
+            }
+          ]
+        end
+        let(:manifest) do
+          {
+            'name' => 'appcloud',
+            'version' => '42+dev.1',
+            'commit_hash' => '12345678',
+            'uncommitted_changes' => true,
+            'jobs' => manifest_jobs,
+            'compiled_packages' => manifest_compiled_packages,
+          }
+        end
+
+        context 'when release already exists' do
+          let!(:package) do
+            package = Models::Package.make(
+              release: release,
+              name: 'fake-name-1',
+              version: 'fake-version-1',
+              fingerprint: 'fake-fingerprint-1',
+            )
+            release_version_model.add_package(package)
+            package
+          end
+          let!(:existing_compiled_package_with_different_dependencies) do
+            compiled_package = Models::CompiledPackage.make(
+              blobstore_id: 'fake-compiled-blobstore-id-2',
+              dependency_key: 'blarg',
+              sha1: 'fake-compiled-sha-1',
+              stemcell_os: 'macintosh os',
+              stemcell_version: '7.1'
+            )
+            package.add_compiled_package compiled_package
+            compiled_package
+          end
+          let!(:compiled_package) do
+            compiled_package = Models::CompiledPackage.make(
+              blobstore_id: 'fake-compiled-blobstore-id-1',
+              dependency_key: '[]',
+              sha1: 'fake-compiled-sha-1',
+              stemcell_os: 'macintosh os',
+              stemcell_version: '7.1'
+            )
+            package.add_compiled_package compiled_package
+            compiled_package
+          end
+
+          it 're-uploads all compiled packages to replace old ones' do
+            expect(BlobUtil).to receive(:delete_blob).with('fake-compiled-blobstore-id-1')
+            expect(BlobUtil).to receive(:create_blob).with(
+              File.join(release_dir, 'compiled_packages', 'fake-name-1.tgz')
+            ).and_return('new-compiled-blobstore-id-after-fix')
+            expect{
+              job.perform
+            }.to change { compiled_package.reload.blobstore_id }.from('fake-compiled-blobstore-id-1').to('new-compiled-blobstore-id-after-fix')
+          end
+        end
+
+        context 'when re-using existing compiled packages from other releases' do
+          let!(:another_release) { Models::Release.make(name: 'foocloud') }
+          let!(:old_release_version_model) do
+            Models::ReleaseVersion.make(
+              release: another_release,
+              version: '41+dev.1',
+              commit_hash: '23456789',
+              uncommitted_changes: true
+            )
+          end
+          let!(:existing_package) do
+            package = Models::Package.make(
+              release: another_release,
+              name: 'fake-name-1',
+              version: 'fake-version-1',
+              fingerprint: 'fake-fingerprint-1'
+            ).save
+
+            old_release_version_model.add_package(package)
+            package
+          end
+          let!(:existing_package_with_same_fingerprint) do
+            package = Models::Package.make(
+              release: another_release,
+              name: 'fake-name-2',
+              version: 'fake-version-2',
+              fingerprint: 'fake-fingerprint-1'
+            ).save
+
+            old_release_version_model.add_package(package)
+            package
+          end
+          let!(:existing_compiled_package_with_different_dependencies) do
+            existing_compiled_package = Models::CompiledPackage.make(
+                blobstore_id: 'fake-existing-compiled-blobstore-id-2',
+                dependency_key: 'fake-existing-compiled-dependency-key-1-other',
+                sha1: 'fake-existing-compiled-sha-1',
+                stemcell_os: 'macintosh os',
+                stemcell_version: '7.1',
+            )
+            existing_package.add_compiled_package existing_compiled_package
+            existing_compiled_package
+          end
+
+          let!(:existing_compiled_package) do
+            Models::CompiledPackage.make(
+              blobstore_id: 'fake-existing-compiled-blobstore-id-1',
+              dependency_key: '[]',
+              sha1: 'fake-existing-compiled-sha-1',
+              stemcell_os: 'macintosh os',
+              stemcell_version: '7.1'
+            ).tap {|c| existing_package.add_compiled_package(c) }
+          end
+
+          let!(:matching_existing_compiled_package_from_same_release_version) do
+            Models::CompiledPackage.make(
+                blobstore_id: 'fake-existing-compiled-blobstore-id-A',
+                dependency_key: '[]',
+                sha1: 'fake-existing-compiled-sha-1',
+                stemcell_os: 'macintosh os',
+                stemcell_version: '7.1'
+            ).tap {|c| existing_package_with_same_fingerprint.add_compiled_package(c) }
+          end
+          it 'replaces existing compiled packages and copy blobs' do
+            expect(BlobUtil).to receive(:delete_blob).with('fake-existing-compiled-blobstore-id-1')
+            expect(BlobUtil).to receive(:delete_blob).with('fake-existing-compiled-blobstore-id-A')
+            expect(BlobUtil).to receive(:create_blob).with(
+              File.join(release_dir, 'compiled_packages', 'fake-name-1.tgz')
+            ).and_return('new-existing-compiled-blobstore-id-after-fix', 'new-existing-compiled-blobstore-id-A-after-fix')
+            expect(BlobUtil).to receive(:copy_blob).with(
+               'new-existing-compiled-blobstore-id-after-fix').and_return('new-compiled-blobstore-id')
+            expect(existing_compiled_package.reload.blobstore_id).to eq('fake-existing-compiled-blobstore-id-1')
+            expect(matching_existing_compiled_package_from_same_release_version.reload.blobstore_id).to eq('fake-existing-compiled-blobstore-id-A')
+            job.perform
+            expect(existing_compiled_package.reload.blobstore_id).to eq('new-existing-compiled-blobstore-id-after-fix')
+            expect(matching_existing_compiled_package_from_same_release_version.reload.blobstore_id).to eq('new-existing-compiled-blobstore-id-A-after-fix')
+          end
+        end
       end
     end
 

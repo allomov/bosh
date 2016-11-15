@@ -8,11 +8,12 @@ describe Bosh::Monitor do
       'director' => {},
       'http' => http_config,
       'loglevel' => 'debug',
+      'em_threadpool_size' => 20,
       'plugins' => %w(plugin1 plugin2)
     } }
 
     before do
-      [:logger, :director, :intervals, :mbus, :event_mbus, :agent_manager, :event_processor,
+      [:logger, :director, :intervals, :mbus, :event_mbus, :instance_manager, :event_processor,
        :http_port, :plugins, :nats].each do |accessor|
         Bosh::Monitor.send("#{accessor}=", nil)
       end
@@ -53,6 +54,15 @@ describe Bosh::Monitor do
         it 'should set a default for rogue_agent_alert' do
           expect(Bosh::Monitor.intervals.rogue_agent_alert).to eq(120)
         end
+
+        it 'should set a default for analyze_instances' do
+          expect(Bosh::Monitor.intervals.analyze_instances).to eq(60)
+        end
+
+        it 'should set a default for em_threadpool_size' do
+          expect(Bosh::Monitor.em_threadpool_size).to eq(20)
+        end
+
       end
 
       context 'with http config' do

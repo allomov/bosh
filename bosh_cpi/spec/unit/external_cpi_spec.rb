@@ -11,6 +11,7 @@ describe Bosh::Clouds::ExternalCpi do
 
     before { allow(File).to receive(:executable?).with('/path/to/fake-cpi/bin/cpi').and_return(true) }
 
+    let (:method) {method}
     let(:cpi_response) { JSON.dump(result: nil, error: nil, log: '') }
 
     before { stub_const('Bosh::Clouds::Config', config) }
@@ -44,15 +45,26 @@ describe Bosh::Clouds::ExternalCpi do
     describe 'log' do
       let(:cpi_response) { JSON.dump(result: 'fake-result', error: nil, log: 'fake-log') }
 
-      it 'saves the log in task cpi log' do
+      it 'saves the log and stderr in task cpi log' do
         call_cpi_method
-        expect(File.read(cpi_log_path)).to eq('fake-log')
+        expect(File.read(cpi_log_path)).to eq('fake-logfake-stderr-data')
       end
 
       it 'adds to existing file if for a given task several cpi requests were made' do
         external_cpi.public_send(method, *arguments)
         external_cpi.public_send(method, *arguments)
-        expect(File.read(cpi_log_path)).to eq('fake-logfake-log')
+        expect(File.read(cpi_log_path)).to eq('fake-logfake-stderr-datafake-logfake-stderr-data')
+      end
+
+      context 'when no stderr' do
+        before {
+          allow(Open3).to receive(:capture3).and_return(cpi_response, nil, 0)
+        }
+
+        it 'saves the log in task cpi log' do
+          call_cpi_method
+          expect(File.read(cpi_log_path)).to eq('fake-log')
+        end
       end
     end
 
@@ -80,7 +92,7 @@ describe Bosh::Clouds::ExternalCpi do
           call_cpi_method
         }.to raise_error(
           Bosh::Clouds::ExternalCpi::NonExecutable,
-          "Failed to run cpi: `/path/to/fake-cpi/bin/cpi' is not executable",
+          "Failed to run cpi: '/path/to/fake-cpi/bin/cpi' is not executable",
         )
       end
     end
@@ -100,7 +112,7 @@ describe Bosh::Clouds::ExternalCpi do
         end
 
         it 'raises an error constructed from error response' do
-          expect { call_cpi_method }.to raise_error(error_class, 'fake-error-message')
+          expect { call_cpi_method }.to raise_error(error_class, "CPI error '#{error_class}' with message 'fake-error-message' in '#{method}' CPI method")
         end
       end
 
@@ -122,7 +134,7 @@ describe Bosh::Clouds::ExternalCpi do
             call_cpi_method
           }.to raise_error do |error|
             expect(error.class).to eq(error_class)
-            expect(error.message).to eq('fake-error-message')
+            expect(error.message).to eq("CPI error '#{error_class}' with message 'fake-error-message' in '#{method}' CPI method")
             expect(error.ok_to_retry).to eq(true)
           end
         end
@@ -182,7 +194,7 @@ describe Bosh::Clouds::ExternalCpi do
             call_cpi_method
           }.to raise_error(
             Bosh::Clouds::ExternalCpi::UnknownError,
-            "Unknown CPI error 'FakeUnrecognizableError' with message 'Something went 'wrong''",
+            "Unknown CPI error 'FakeUnrecognizableError' with message 'Something went 'wrong'' in '#{method}' CPI method",
           )
         end
       end
@@ -235,10 +247,6 @@ describe Bosh::Clouds::ExternalCpi do
 
   describe '#set_vm_metadata' do
     it_calls_cpi_method(:set_vm_metadata, :set_vm_metadata, 'fake-vm-cid', {'metadata' => 'hash'})
-  end
-
-  describe '#configure_networks' do
-    it_calls_cpi_method(:configure_networks, :configure_networks, 'fake-vm-cid', {'net' => 'props'})
   end
 
   describe '#create_disk' do

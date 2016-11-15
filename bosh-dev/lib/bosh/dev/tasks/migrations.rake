@@ -8,9 +8,12 @@ namespace :migrations do
 
       timestamp = Time.new.getutc.strftime('%Y%m%d%H%M%S')
       new_migration_path = "bosh-director/db/migrations/#{namespace}/#{timestamp}_#{name}.rb"
+      new_migration_spec_path = "bosh-director/spec/unit/db/migrations/#{namespace}/#{timestamp}_#{name}_spec.rb"
 
       puts "Creating #{new_migration_path}"
+      puts "Creating #{new_migration_spec_path}"
       FileUtils.touch(new_migration_path)
+      FileUtils.touch(new_migration_spec_path)
     end
   end
 
@@ -25,18 +28,6 @@ namespace :migrations do
 
       puts "Creating #{new_migration_path}"
       FileUtils.touch(new_migration_path)
-    end
-  end
-
-  namespace :bosh_cli_plugin_aws do
-    desc 'Generate a new AWS migration with NAME'
-    task :new, :name do |_, args|
-      args = args.to_hash
-      name = args.fetch(:name)
-
-      require 'bosh_cli_plugin_aws/migration_helper'
-
-      Bosh::AwsCliPlugin::MigrationHelper.generate_migration_file(name)
     end
   end
 end
